@@ -172,7 +172,7 @@ const QUESTION_CONFIG = {
     // the generic generator derives LAN/WAN requirements, subnet sizes,
     // parent-network fit, allocation stages, and validation keys.
     atom6: {
-        enabled: true,
+        enabled: false,
         minLans: 3,
         maxLans: 5,
         minWans: 1,
@@ -312,7 +312,7 @@ const QUESTION_CONFIG = {
     // checks capacity, containment, uniqueness, gateways, WANs, and static
     // routes instead of comparing against Atom 6's canonical allocation.
     atom8: {
-        enabled: true,
+        enabled: false,
         representativeHosts: { min: 2, max: 3 },
         wanCidr: 30,
         dceClockRate: 64000,
