@@ -241,6 +241,100 @@ const QUESTION_CONFIG = {
         }
     },
 
+    // Atom 7: Packet Tracer Design Brief — one ungraded, read-only VLSM
+    // requirement per student session. It deliberately reuses Atom 6's
+    // scenario generator, while keeping every topology and seed parameter
+    // here so instructors can author a different capstone without changing
+    // the generator or renderer.
+    atom7: {
+        enabled: true,
+        seed: {
+            strategy: 'per-user-session',
+            prefix: 'atom7-requirement',
+            salt: 'packet-tracer-v1'
+        },
+        minLans: 5,
+        maxLans: 5,
+        minWans: 2,
+        maxWans: 2,
+        topology: {
+            minRouters: 3,
+            maxRouters: 3,
+            maxLanPortsPerRouter: 2,
+            maxWanPortsPerRouter: 2
+        },
+        wanRequirement: {
+            requiredIp: 2,
+            allocationCidr: 30,
+            useSharedSourceSubnet: true,
+            equivalentOrdering: true
+        },
+        lanProfiles: [
+            // These envelopes cap allocations at /26, /27, and /28 so even
+            // the largest possible five-LAN combination plus two /30 WANs
+            // fits inside the configured Class C /24 parent.
+            { id: 'large', minHosts: 31, maxHosts: 60, weight: 2 },
+            { id: 'medium', minHosts: 15, maxHosts: 30, weight: 3 },
+            { id: 'small', minHosts: 5, maxHosts: 14, weight: 4 }
+        ],
+        lanNames: [
+            'Admissions', 'Administration', 'Accounting', 'Computer Laboratory',
+            'Faculty', 'Library', 'Operations', 'Records', 'Registrar',
+            'Research', 'Student Services', 'Training Center'
+        ],
+        scenario: {
+            id: 'packet-tracer-capstone',
+            label: 'Packet Tracer Design',
+            routerCount: 3,
+            lanCount: 5,
+            wanCount: 2,
+            lanPortsPerRouter: [2, 1, 2],
+            wanRouterPairs: [[1, 2], [2, 3]],
+            parentPools: [
+                // Configured Class C pool. Starting at 193 retains the project
+                // convention of avoiding the familiar 192.168.x.0 range.
+                { cidr: 24, octetRanges: [[193, 223], [0, 254], [0, 254], [0, 255]] }
+            ]
+        },
+        brief: {
+            title: 'Plan and Implement This Network',
+            description: 'Create a complete VLSM addressing plan outside Subnetacad, then build and test the design in Packet Tracer.',
+            deliverables: [
+                'A VLSM plan for every listed LAN and WAN',
+                'A Packet Tracer implementation of the generated topology',
+                'Working addressing and end-to-end connectivity across the network'
+            ]
+        }
+    },
+
+    // Atom 8: scored in-app deployment of the exact Atom 7 scenario.
+    // Students may submit any internally valid VLSM design; the validator
+    // checks capacity, containment, uniqueness, gateways, WANs, and static
+    // routes instead of comparing against Atom 6's canonical allocation.
+    atom8: {
+        enabled: true,
+        representativeHosts: { min: 2, max: 3 },
+        wanCidr: 30,
+        dceClockRate: 64000,
+        routing: 'static',
+        lanInterfaceNames: [
+            ['GigabitEthernet0/0', 'GigabitEthernet0/1'],
+            ['GigabitEthernet0/0'],
+            ['GigabitEthernet0/0', 'GigabitEthernet0/1']
+        ],
+        wanInterfaceNames: [
+            ['Serial0/0/0'],
+            ['Serial0/0/0', 'Serial0/0/1'],
+            ['Serial0/0/0']
+        ],
+        dceRouterByWan: [1, 2],
+        scoring: {
+            pointsPerRouterPort: 1,
+            pointsPerHost: 1,
+            pointsPerRoutingTable: 1
+        }
+    },
+
     // Grading
     strictLeadingZeros: true // binary answers must match bit-width exactly
 };
@@ -268,6 +362,10 @@ const LOCAL_SESSION_SCHEMA_VERSION = 3;
 // scenarios before the saved answers and scores are applied.
 let currentPracticeSeed = null;
 let currentQuestionSeed = null;
+let currentAtom7Seed = null;
+let currentAtom7SeedOwner = null;
+let atom7Scenario = null;
+let atom8Model = null;
 
 // Builds a seed string that's different on every call — timestamp plus a
 // random component, so even two logins in the same millisecond can't
@@ -276,10 +374,22 @@ function generateRandomPracticeSeed() {
     return `practice-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 }
 
+function generateAtom7Seed() {
+    const cfg = QUESTION_CONFIG.atom7?.seed || {};
+    const prefix = String(cfg.prefix || 'atom7-requirement');
+    if (cfg.strategy === 'shared') {
+        return String(cfg.value || `${prefix}-shared`);
+    }
+    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
 function loadAppPreferences() {
     try {
         const raw = localStorage.getItem(APP_PREFERENCES_STORAGE_KEY);
         const saved = raw ? JSON.parse(raw) : null;
+        if (saved && ['practice', 'exam'].includes(saved.mode)) {
+            appSettings.mode = saved.mode;
+        }
         if (saved && ['fixed', 'random'].includes(saved.practiceQuestionMode)) {
             appSettings.practiceQuestionMode = saved.practiceQuestionMode;
         }
@@ -289,20 +399,21 @@ function loadAppPreferences() {
             appSettings.timerMinutes = saved.timerMinutes;
         }
     } catch (err) {
-        console.warn('Could not load Practice preferences:', err);
+        console.warn('Could not load app preferences:', err);
     }
 }
 
 function saveAppPreferences() {
     try {
         localStorage.setItem(APP_PREFERENCES_STORAGE_KEY, JSON.stringify({
+            mode: appSettings.mode,
             practiceQuestionMode: appSettings.practiceQuestionMode,
             persistenceEnabled: appSettings.persistenceEnabled,
             timerEnabled: appSettings.timerEnabled,
             timerMinutes: appSettings.timerMinutes
         }));
     } catch (err) {
-        console.warn('Could not save Practice preferences:', err);
+        console.warn('Could not save app preferences:', err);
     }
 }
 
@@ -569,6 +680,10 @@ document.addEventListener('keydown', (e) => {
         const hintModal = document.getElementById('atom5HintModal');
         if (hintModal && hintModal.style.display === 'block') {
             closeAtom5HintModal();
+        }
+        const atom8Modal = document.getElementById('atom8ConfigModal');
+        if (atom8Modal && atom8Modal.style.display === 'block') {
+            closeAtom8Modal();
         }
     }
 });
@@ -1295,6 +1410,13 @@ async function loadAllExercises() {
     if (resumedSession && resumedSession.practiceSeed) {
         currentPracticeSeed = resumedSession.practiceSeed;
     }
+    if (resumedSession && resumedSession.atom7Seed) {
+        currentAtom7Seed = resumedSession.atom7Seed;
+        currentAtom7SeedOwner = currentUser;
+    } else if (currentAtom7SeedOwner !== currentUser) {
+        currentAtom7Seed = null;
+        currentAtom7SeedOwner = currentUser;
+    }
 
     // Question seeding is independent of Practice/Exam mode:
     //   - 'fixed'  -> the same constant seed every time, so every student
@@ -1402,6 +1524,28 @@ async function loadAllExercises() {
     });
     renderAtom6View(atom6List);
 
+    // Atom 7 is intentionally absent from exerciseData: it is a single
+    // read-only requirement and therefore contributes no answers or points.
+    // Its own persisted seed keeps the brief stable even when the scored
+    // question-set seeding strategy changes.
+    if (QUESTION_CONFIG.atom7?.enabled) {
+        if (!currentAtom7Seed) currentAtom7Seed = generateAtom7Seed();
+        atom7Scenario = buildAtom7Scenario(currentAtom7Seed);
+        renderAtom7View(atom7Scenario);
+    } else {
+        atom7Scenario = null;
+        renderAtom7View(null);
+    }
+
+    if (QUESTION_CONFIG.atom8?.enabled && atom7Scenario) {
+        atom8Model = atom8BuildModel(atom7Scenario, currentAtom7Seed);
+        exerciseData['atom8-main'] = atom8BuildExerciseData(atom7Scenario, atom8Model);
+        renderAtom8View();
+    } else {
+        atom8Model = null;
+        renderAtom8View();
+    }
+
     document.getElementById('loader').style.display = 'none';
 
     // Restore persisted progress after deterministically rebuilding the saved
@@ -1436,6 +1580,7 @@ async function loadAllExercises() {
     syncAtom4ViewDOM();
     syncAtom5ViewDOM();
     syncAtom6ViewDOM();
+    syncAtom8ViewDOM();
 
     // Persist the seed immediately and synchronize any independent setting
     // changes (for example, turning the timer off for an existing session).
@@ -2675,6 +2820,8 @@ function showAtom1Page() {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('atom1View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -3142,6 +3289,8 @@ function showAtom2Page() {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
 
     showAtomPaginationBar('atom2');
 
@@ -4409,7 +4558,7 @@ function syncAtom4ViewDOM() {
 function showAtom4Page() {
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom4')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom5View', 'atom6View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom5View', 'atom6View', 'atom7View', 'atom8View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
@@ -4437,6 +4586,8 @@ function showAtom3Page() {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('atom3View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -5354,6 +5505,9 @@ function showAtom5Page() {
     document.getElementById('atom2View').style.display = 'none';
     document.getElementById('atom3View').style.display = 'none';
     document.getElementById('atom4View').style.display = 'none';
+    document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -5592,6 +5746,16 @@ function atom6GenerateScenario(level, cfg, rng, scenarioIndex) {
         };
     }
     throw new Error('Atom 6 could not generate a feasible scenario for level ' + level.id + '. Check its configuration.');
+}
+
+function buildAtom7Scenario(seedStr) {
+    const cfg = QUESTION_CONFIG.atom7;
+    if (!cfg || !cfg.enabled) return null;
+    const seedCfg = cfg.seed || {};
+    const rng = mulberry32(hashStringToSeed(
+        String(seedStr || '') + '::atom7::' + String(seedCfg.salt || '')
+    ));
+    return atom6GenerateScenario(cfg.scenario, cfg, rng, 0);
 }
 
 function buildAtom6QuestionList(seedStr) {
@@ -6096,13 +6260,493 @@ function syncAtom6ViewDOM() {
 function showAtom6Page() {
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom6')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom7View', 'atom8View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
     document.getElementById('atom6View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
     showAtomPaginationBar('atom6');
+    currentFile = '';
+    closeSampleOutputModal();
+    updateConsoleDrawerTab(false);
+    closeSidebarIfMobile();
+}
+
+/* =========================================================
+   ATOM 7: PACKET TRACER DESIGN BRIEF
+   One persistent, seeded, read-only requirement. No exerciseData entry,
+   input controls, grading state, score, or pagination is created here.
+========================================================= */
+function atom7BuildBrief(scenario) {
+    if (!scenario) return '';
+    const cfg = QUESTION_CONFIG.atom7;
+    const brief = cfg.brief || {};
+    const deliverables = Array.isArray(brief.deliverables) ? brief.deliverables : [];
+    return '<section class="panel atom7-brief-panel" aria-label="Packet Tracer activity requirement">' +
+        '<div class="atom7-brief-heading"><div><span>Independent Performance Task</span>' +
+        '<h2>' + atom6Escape(brief.title || 'Plan and Implement This Network') + '</h2>' +
+        '<p>' + atom6Escape(brief.description || '') + '</p></div>' +
+        '<span class="atom7-readonly-badge"><i class="fa-solid fa-eye" aria-hidden="true"></i> Read-only · Ungraded</span></div>' +
+        atom6BuildScenarioBoard(scenario) +
+        (deliverables.length ? '<div class="atom7-deliverables"><h3>Required Output</h3><ul>' + deliverables.map(item =>
+            '<li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>' + atom6Escape(item) + '</span></li>'
+        ).join('') + '</ul></div>' : '') +
+        '</section>';
+}
+
+function renderAtom7View(scenario) {
+    const view = document.getElementById('atom7View');
+    const container = document.getElementById('atom7RequirementContainer');
+    const nav = document.getElementById('nav-atom7');
+    const enabled = !!(QUESTION_CONFIG.atom7?.enabled && scenario);
+    if (nav) nav.style.display = enabled ? '' : 'none';
+    if (container) container.innerHTML = enabled ? atom7BuildBrief(scenario) : '';
+    if (!enabled && view) view.style.display = 'none';
+}
+
+function showAtom7Page() {
+    if (!QUESTION_CONFIG.atom7?.enabled || !atom7Scenario) return;
+    document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+    document.getElementById('nav-atom7')?.classList.add('active');
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom8View'].forEach(id => {
+        const view = document.getElementById(id);
+        if (view) view.style.display = 'none';
+    });
+    document.getElementById('atom7View').style.display = 'flex';
+    document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
+    hideAllAtomPaginationBars();
+    currentFile = '';
+    closeSampleOutputModal();
+    updateConsoleDrawerTab(false);
+    closeSidebarIfMobile();
+}
+
+/* =========================================================
+   ATOM 8: IN-APP VLSM DEPLOYMENT
+========================================================= */
+let atom8HandlersAttached = false;
+
+function atom8BuildModel(scenario, seedStr) {
+    const cfg = QUESTION_CONFIG.atom8;
+    const rng = mulberry32(hashStringToSeed(String(seedStr || '') + '::atom8-devices'));
+    const routers = scenario.routers.map((router, routerIndex) => {
+        const lanPorts = router.lanIds.map((lanId, i) => ({
+            id: 'lan-port-' + (i + 1), role: 'lan', targetId: lanId,
+            name: cfg.lanInterfaceNames[routerIndex]?.[i] || ('GigabitEthernet0/' + i),
+            dce: false
+        }));
+        const wanPorts = router.wanIds.map((wanId, i) => {
+            const wan = scenario.wans.find(item => item.id === wanId);
+            return {
+                id: 'wan-port-' + (i + 1), role: 'wan', targetId: wanId,
+                name: cfg.wanInterfaceNames[routerIndex]?.[i] || ('Serial0/0/' + i),
+                dce: Number(cfg.dceRouterByWan[wan.number - 1]) === router.number
+            };
+        });
+        return {
+            id: router.id, number: router.number, ports: [...lanPorts, ...wanPorts],
+            routeCount: scenario.lans.filter(lan => lan.routerId !== router.id).length
+        };
+    });
+    const hosts = scenario.lans.flatMap(lan => {
+        const count = randInt(rng, Number(cfg.representativeHosts.min), Number(cfg.representativeHosts.max));
+        return Array.from({ length: count }, (_, i) => ({
+            id: lan.id + '-host-' + (i + 1), number: i + 1, lanId: lan.id,
+            label: 'PC ' + lan.number + '-' + (i + 1)
+        }));
+    });
+    return { routers, hosts };
+}
+
+function atom8InitialState(model) {
+    const routers = {};
+    model.routers.forEach(router => {
+        routers[router.id] = {
+            applied: false, locked: false,
+            ports: Object.fromEntries(router.ports.map(port => [port.id, {
+                ip: '', mask: '', enabled: false, clockRate: port.dce ? '' : null
+            }])),
+            routes: Array.from({ length: router.routeCount }, () => ({ destination: '', mask: '', nextHop: '' }))
+        };
+    });
+    const hosts = Object.fromEntries(model.hosts.map(host => [host.id, {
+        ip: '', mask: '', gateway: '', applied: false, locked: false
+    }]));
+    return { routers, hosts, validation: { ports: {}, hosts: {}, routers: {}, routes: {} } };
+}
+
+function atom8PossibleScore(model) {
+    const scoring = QUESTION_CONFIG.atom8.scoring;
+    const ports = model.routers.reduce((sum, router) => sum + router.ports.length, 0);
+    return ports * Number(scoring.pointsPerRouterPort) +
+        model.hosts.length * Number(scoring.pointsPerHost) +
+        model.routers.length * Number(scoring.pointsPerRoutingTable);
+}
+
+function atom8BuildExerciseData(scenario, model) {
+    const possible = atom8PossibleScore(model);
+    return {
+        type: 'atom8', label: 'Atom 8 · In-App Deployment', phase: 'Atom 8 · In-App Deployment',
+        scenario, model, answers: Array.from({ length: possible }, () => 'valid'),
+        score: 0, locked: false, isPartial: false, isConversionQuestion: true,
+        userAnswer: '', atom8State: atom8InitialState(model)
+    };
+}
+
+function atom8RestoreState(ex) {
+    if (!ex?.userAnswer) return ex?.atom8State || atom8InitialState(ex.model);
+    try { return JSON.parse(ex.userAnswer); }
+    catch (err) { console.warn('Could not restore Atom 8 state:', err); }
+    return atom8InitialState(ex.model);
+}
+
+function atom8ParseIp(value) {
+    const text = String(value || '').trim();
+    const parts = text.split('.');
+    if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return null;
+    return { text: parts.map(Number).join('.'), int: atom6IpToInt(parts.map(Number)) };
+}
+
+function atom8MaskPrefix(value) {
+    const parsed = atom8ParseIp(value);
+    if (!parsed) return null;
+    for (let prefix = 0; prefix <= 32; prefix++) {
+        if (atom6MaskOctets(prefix).join('.') === parsed.text) return prefix;
+    }
+    return null;
+}
+
+function atom8ConfiguredBlock(ipValue, maskValue) {
+    const ip = atom8ParseIp(ipValue);
+    const prefix = atom8MaskPrefix(maskValue);
+    if (!ip || prefix === null) return null;
+    const block = atom6Block(ip.int, prefix);
+    return { ...block, ip: ip.text, ipInt: ip.int };
+}
+
+function atom8BlocksOverlap(a, b) {
+    return a.networkInt <= b.networkInt + b.availableIp - 1 && b.networkInt <= a.networkInt + a.availableIp - 1;
+}
+
+function atom8FirstHop(scenario, startId, destinationId) {
+    const queue = [{ id: startId, first: null }];
+    const seen = new Set([startId]);
+    while (queue.length) {
+        const current = queue.shift();
+        if (current.id === destinationId) return current.first;
+        scenario.wans.forEach(wan => {
+            let next = null;
+            if (wan.fromRouterId === current.id) next = wan.toRouterId;
+            else if (wan.toRouterId === current.id) next = wan.fromRouterId;
+            if (!next || seen.has(next)) return;
+            seen.add(next);
+            queue.push({ id: next, first: current.first || { routerId: next, wanId: wan.id } });
+        });
+    }
+    return null;
+}
+
+function atom8Validate(ex) {
+    const scenario = ex.scenario;
+    const model = ex.model;
+    const state = ex.atom8State;
+    const parentStart = scenario.parent.networkInt;
+    const parentEnd = parentStart + scenario.parent.availableIp - 1;
+    const validation = { ports: {}, hosts: {}, routers: {}, routes: {} };
+    const portRecords = [];
+    const assignments = [];
+
+    model.routers.forEach(router => {
+        const routerState = state.routers[router.id];
+        router.ports.forEach(port => {
+            const key = router.id + ':' + port.id;
+            const input = routerState.ports[port.id];
+            if (!routerState.applied) { validation.ports[key] = 'gray'; return; }
+            const block = atom8ConfiguredBlock(input.ip, input.mask);
+            let valid = !!(block && input.enabled && block.ipInt > block.networkInt && block.ipInt < block.networkInt + block.availableIp - 1 && block.networkInt >= parentStart && block.networkInt + block.availableIp - 1 <= parentEnd);
+            if (valid && port.role === 'lan') {
+                const lan = scenario.lans.find(item => item.id === port.targetId);
+                valid = block.usableIp >= lan.hosts;
+            }
+            if (valid && port.role === 'wan') valid = block.cidr === Number(QUESTION_CONFIG.atom8.wanCidr);
+            if (valid && port.dce) valid = Number(input.clockRate) === Number(QUESTION_CONFIG.atom8.dceClockRate);
+            validation.ports[key] = valid ? 'green' : 'red';
+            if (block) {
+                portRecords.push({ key, routerId: router.id, port, block });
+                assignments.push({ key, ip: block.ip });
+            }
+        });
+    });
+
+    const grouped = {};
+    portRecords.forEach(record => (grouped[record.port.targetId] ||= []).push(record));
+    Object.values(grouped).forEach(records => {
+        const first = records[0]?.block;
+        if (records.some(record => record.block.network !== first.network || record.block.cidr !== first.cidr)) {
+            records.forEach(record => { validation.ports[record.key] = 'red'; });
+        }
+        if (records[0]?.port.role === 'wan' && records.length !== 2) {
+            records.forEach(record => { validation.ports[record.key] = 'red'; });
+        }
+    });
+    const targetBlocks = Object.entries(grouped).map(([targetId, records]) => ({ targetId, block: records[0].block, records }));
+    for (let i = 0; i < targetBlocks.length; i++) for (let j = i + 1; j < targetBlocks.length; j++) {
+        if (atom8BlocksOverlap(targetBlocks[i].block, targetBlocks[j].block)) {
+            [...targetBlocks[i].records, ...targetBlocks[j].records].forEach(record => { validation.ports[record.key] = 'red'; });
+        }
+    }
+
+    model.hosts.forEach(host => {
+        const input = state.hosts[host.id];
+        if (!input.applied) { validation.hosts[host.id] = 'gray'; return; }
+        const block = atom8ConfiguredBlock(input.ip, input.mask);
+        const gateway = atom8ParseIp(input.gateway);
+        const lanPort = portRecords.find(record => record.port.role === 'lan' && record.port.targetId === host.lanId);
+        let valid = !!(block && gateway && lanPort && validation.ports[lanPort.key] === 'green');
+        if (valid) valid = block.network === lanPort.block.network && block.cidr === lanPort.block.cidr && gateway.text === lanPort.block.ip && block.ipInt > block.networkInt && block.ipInt < block.networkInt + block.availableIp - 1;
+        validation.hosts[host.id] = valid ? 'green' : 'red';
+        if (block) assignments.push({ key: host.id, ip: block.ip });
+    });
+    const ipGroups = {};
+    assignments.forEach(item => (ipGroups[item.ip] ||= []).push(item.key));
+    Object.values(ipGroups).filter(keys => keys.length > 1).flat().forEach(key => {
+        if (key.includes(':')) validation.ports[key] = 'red';
+        else validation.hosts[key] = 'red';
+    });
+
+    model.routers.forEach(router => {
+        const routerState = state.routers[router.id];
+        if (!routerState.applied) {
+            validation.routes[router.id] = 'gray';
+            validation.routers[router.id] = 'gray';
+            return;
+        }
+        const expected = scenario.lans.filter(lan => lan.routerId !== router.id).map(lan => {
+            const destinationPort = portRecords.find(record => record.port.role === 'lan' && record.port.targetId === lan.id);
+            const hop = atom8FirstHop(scenario, router.id, lan.routerId);
+            const nextPort = hop && portRecords.find(record => record.routerId === hop.routerId && record.port.targetId === hop.wanId);
+            return destinationPort && nextPort ? {
+                destination: destinationPort.block.network,
+                mask: destinationPort.block.mask.join('.'),
+                nextHop: nextPort.block.ip
+            } : null;
+        });
+        const used = new Set();
+        const portsValid = router.ports.every(port => validation.ports[router.id + ':' + port.id] === 'green');
+        let routesValid = portsValid && expected.length === routerState.routes.length && expected.every(route => {
+            if (!route) return false;
+            const index = routerState.routes.findIndex((input, i) => !used.has(i) &&
+                atom8ParseIp(input.destination)?.text === route.destination &&
+                atom8ParseIp(input.mask)?.text === route.mask &&
+                atom8ParseIp(input.nextHop)?.text === route.nextHop);
+            if (index < 0) return false;
+            used.add(index);
+            return true;
+        });
+        validation.routes[router.id] = routesValid ? 'green' : 'red';
+        validation.routers[router.id] = portsValid && routesValid ? 'green' : 'red';
+    });
+
+    const scoring = QUESTION_CONFIG.atom8.scoring;
+    const greenPorts = Object.values(validation.ports).filter(value => value === 'green').length;
+    const greenHosts = Object.values(validation.hosts).filter(value => value === 'green').length;
+    const greenRoutes = Object.values(validation.routes).filter(value => value === 'green').length;
+    ex.score = greenPorts * Number(scoring.pointsPerRouterPort) + greenHosts * Number(scoring.pointsPerHost) + greenRoutes * Number(scoring.pointsPerRoutingTable);
+    ex.isPartial = ex.score > 0 && ex.score < ex.answers.length;
+    ex.locked = ex.score === ex.answers.length;
+    state.validation = validation;
+    ex.userAnswer = JSON.stringify(state);
+    return validation;
+}
+
+function atom8StatusDot(status) {
+    return '<span class="atom8-status-dot ' + atom6Escape(status || 'gray') + '" aria-label="' + atom6Escape(status || 'not configured') + '"></span>';
+}
+
+function atom8PortOverlay(ex, router, port) {
+    const state = ex.atom8State.routers[router.id].ports[port.id];
+    const status = ex.atom8State.validation.ports[router.id + ':' + port.id] || 'gray';
+    const prefix = atom8MaskPrefix(state.mask);
+    const value = state.ip && prefix !== null ? state.ip + '/' + prefix : 'Not configured';
+    return '<div class="atom8-port-overlay">' + atom8StatusDot(status) + '<span><strong>' + atom6Escape(port.name) + '</strong><small>' + atom6Escape(value) + '</small></span></div>';
+}
+
+function atom8BuildTopology(ex) {
+    const scenario = ex.scenario;
+    const model = ex.model;
+    const wanLinks = scenario.wans.map(wan => {
+        const endpoints = model.routers.filter(router => router.ports.some(port => port.targetId === wan.id));
+        return '<div class="atom8-wan-link">' + atom8PortOverlay(ex, endpoints[0], endpoints[0].ports.find(port => port.targetId === wan.id)) +
+            '<div class="atom8-serial-line"><span>WAN ' + wan.number + ' · Serial</span></div>' +
+            atom8PortOverlay(ex, endpoints[1], endpoints[1].ports.find(port => port.targetId === wan.id)) + '</div>';
+    }).join('');
+    const routerSites = model.routers.map(router => {
+        const routerStatus = ex.atom8State.validation.routers[router.id] || 'gray';
+        const lans = scenario.lans.filter(lan => lan.routerId === router.id).map(lan => {
+            const port = router.ports.find(item => item.targetId === lan.id);
+            const hosts = model.hosts.filter(host => host.lanId === lan.id).map(host => {
+                const input = ex.atom8State.hosts[host.id];
+                const status = ex.atom8State.validation.hosts[host.id] || 'gray';
+                const prefix = atom8MaskPrefix(input.mask);
+                const value = input.ip && prefix !== null ? input.ip + '/' + prefix : 'Not configured';
+                return '<button type="button" class="atom8-device-button atom8-host-button" data-device-kind="host" data-device-id="' + host.id + '">' +
+                    atom8StatusDot(status) + '<i class="fa-solid fa-desktop" aria-hidden="true"></i><strong>' + atom6Escape(host.label) + '</strong><small>' + atom6Escape(value) + '</small></button>';
+            }).join('');
+            return '<article class="atom8-lan-branch">' + atom8PortOverlay(ex, router, port) +
+                '<div class="atom8-switch"><i class="fa-solid fa-network-wired" aria-hidden="true"></i><strong>LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + '</strong><small>' + lan.hosts + ' hosts required</small></div>' +
+                '<div class="atom8-host-grid">' + hosts + '</div></article>';
+        }).join('');
+        return '<section class="atom8-router-site"><button type="button" class="atom8-device-button atom8-router-button" data-device-kind="router" data-device-id="' + router.id + '">' +
+            atom8StatusDot(routerStatus) + '<i class="fa-solid fa-router" aria-hidden="true"></i><strong>Router ' + router.number + '</strong><small>Configure interfaces and static routes</small></button>' +
+            '<div class="atom8-router-lans">' + lans + '</div></section>';
+    }).join('');
+    return '<section class="atom8-topology"><div class="atom6-topology-heading"><div><span>Interactive Deployment</span><h3>Device Topology</h3></div><small>Select a router or host to configure it. Switches require no configuration.</small></div>' +
+        '<div class="atom8-wan-links">' + wanLinks + '</div><div class="atom8-router-grid">' + routerSites + '</div></section>';
+}
+
+function atom8BuildPanel(ex) {
+    const scenario = ex.scenario;
+    const score = ex.score + '/' + ex.answers.length;
+    const lanCards = scenario.lans.map(lan => '<article class="atom6-requirement-card atom6-lan-card"><div class="atom6-requirement-type">LAN ' + lan.number + '</div><div class="atom6-requirement-name">' + atom6Escape(lan.label) + '</div><strong>' + lan.hosts + ' hosts</strong></article>');
+    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Point-to-Point</div><strong>2 IP required</strong></article>');
+    return '<section class="panel atom8-panel"><div class="panel-head"><span class="panel-index">A8</span><div><h2>Apply Your VLSM Design</h2><p>Configurations are validated and scored automatically whenever they are applied.</p></div><span class="badge atom1-score-badge" id="atom8ScoreBadge">' + score + '</span></div>' +
+        '<div class="atom6-parent-network"><span><small>Primary allocation source</small>Parent Network</span><strong>' + scenario.parent.network + '/' + scenario.parent.cidr + '</strong></div>' +
+        atom8BuildTopology(ex) + '<div class="atom6-requirements-heading"><span>Seeded Requirement</span><h3>LAN and WAN Requirements</h3></div><div class="atom6-requirement-grid">' + lanCards.concat(wanCards).join('') + '</div></section>';
+}
+
+function renderAtom8View() {
+    const nav = document.getElementById('nav-atom8');
+    const container = document.getElementById('atom8Container');
+    const ex = exerciseData['atom8-main'];
+    const enabled = !!(QUESTION_CONFIG.atom8?.enabled && ex && atom8Model);
+    if (nav) nav.style.display = enabled ? '' : 'none';
+    if (!container) return;
+    if (!enabled) { container.innerHTML = ''; return; }
+    ex.atom8State = ex.atom8State || atom8RestoreState(ex);
+    atom8Validate(ex);
+    container.innerHTML = atom8BuildPanel(ex);
+    updateAtom8NavScore();
+    if (!atom8HandlersAttached) {
+        atom8HandlersAttached = true;
+        container.addEventListener('click', atom8HandleDeviceClick);
+        document.addEventListener('click', atom8HandleModalClick);
+    }
+}
+
+function syncAtom8ViewDOM() {
+    const ex = exerciseData['atom8-main'];
+    if (!ex) return;
+    ex.atom8State = atom8RestoreState(ex);
+    atom8Validate(ex);
+    renderAtom8View();
+    updateSummaryPanel();
+}
+
+function updateAtom8NavScore() {
+    const ex = exerciseData['atom8-main'];
+    const score = document.getElementById('score-atom8');
+    if (score && ex) score.textContent = ex.score + '/' + ex.answers.length;
+}
+
+function atom8Input(label, kind, id, field, value, disabled) {
+    return '<label><span>' + atom6Escape(label) + '</span><input type="text" data-config-kind="' + kind + '" data-config-id="' + id + '" data-field="' + field + '" value="' + atom6Escape(value || '') + '"' + (disabled ? ' disabled' : '') + '></label>';
+}
+
+function atom8OpenRouterModal(routerId) {
+    const ex = exerciseData['atom8-main'];
+    const router = ex.model.routers.find(item => item.id === routerId);
+    const state = ex.atom8State.routers[routerId];
+    const disabled = !!state.locked;
+    const ports = router.ports.map(port => {
+        const input = state.ports[port.id];
+        return '<fieldset class="atom8-config-group"><legend>' + atom8StatusDot(ex.atom8State.validation.ports[routerId + ':' + port.id] || 'gray') + atom6Escape(port.name) + ' · ' + port.role.toUpperCase() + '</legend><div class="atom8-form-grid">' +
+            atom8Input('IPv4 Address', 'port', port.id, 'ip', input.ip, disabled) + atom8Input('Subnet Mask', 'port', port.id, 'mask', input.mask, disabled) +
+            (port.dce ? atom8Input('DCE Clock Rate', 'port', port.id, 'clockRate', input.clockRate, disabled) : '') +
+            '<label class="atom8-checkbox"><input type="checkbox" data-config-kind="port" data-config-id="' + port.id + '" data-field="enabled"' + (input.enabled ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>Port enabled</span></label></div></fieldset>';
+    }).join('');
+    const routes = state.routes.map((route, i) => '<fieldset class="atom8-config-group"><legend>Static Route ' + (i + 1) + '</legend><div class="atom8-form-grid">' +
+        atom8Input('Destination Network', 'route', i, 'destination', route.destination, disabled) + atom8Input('Subnet Mask', 'route', i, 'mask', route.mask, disabled) + atom8Input('Next-Hop Address', 'route', i, 'nextHop', route.nextHop, disabled) + '</div></fieldset>').join('');
+    atom8ShowModal('Router ' + router.number + ' Configuration', ports + '<div class="atom8-route-heading"><h3>Static Routes</h3><p>Enter one route for every remote LAN.</p></div>' + routes, 'router', routerId, disabled);
+}
+
+function atom8OpenHostModal(hostId) {
+    const ex = exerciseData['atom8-main'];
+    const host = ex.model.hosts.find(item => item.id === hostId);
+    const state = ex.atom8State.hosts[hostId];
+    const lan = ex.scenario.lans.find(item => item.id === host.lanId);
+    const disabled = !!state.locked;
+    const body = '<p class="atom8-modal-context">LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + ' · ' + lan.hosts + ' hosts required</p><div class="atom8-form-grid">' +
+        atom8Input('IPv4 Address', 'host', hostId, 'ip', state.ip, disabled) + atom8Input('Subnet Mask', 'host', hostId, 'mask', state.mask, disabled) + atom8Input('Default Gateway', 'host', hostId, 'gateway', state.gateway, disabled) + '</div>';
+    atom8ShowModal(host.label + ' Configuration', body, 'host', hostId, disabled);
+}
+
+function atom8ShowModal(title, body, kind, id, disabled) {
+    const modal = document.getElementById('atom8ConfigModal');
+    modal.dataset.kind = kind;
+    modal.dataset.id = id;
+    document.getElementById('atom8ModalTitle').textContent = title;
+    document.getElementById('atom8ModalBody').innerHTML = body;
+    const apply = document.getElementById('atom8ApplyConfig');
+    apply.disabled = disabled;
+    apply.textContent = disabled ? 'Configuration Locked' : 'Apply Configuration';
+    modal.style.display = 'block';
+    document.getElementById('atom8ModalOverlay').style.display = 'block';
+}
+
+function closeAtom8Modal() {
+    document.getElementById('atom8ConfigModal').style.display = 'none';
+    document.getElementById('atom8ModalOverlay').style.display = 'none';
+}
+
+function atom8HandleDeviceClick(event) {
+    const button = event.target.closest('.atom8-device-button');
+    if (!button) return;
+    if (button.dataset.deviceKind === 'router') atom8OpenRouterModal(button.dataset.deviceId);
+    else atom8OpenHostModal(button.dataset.deviceId);
+}
+
+function atom8HandleModalClick(event) {
+    if (event.target.closest('.atom8-modal-close')) { closeAtom8Modal(); return; }
+    if (!event.target.closest('#atom8ApplyConfig')) return;
+    const modal = document.getElementById('atom8ConfigModal');
+    const ex = exerciseData['atom8-main'];
+    const kind = modal.dataset.kind;
+    const id = modal.dataset.id;
+    if (kind === 'router') {
+        const target = ex.atom8State.routers[id];
+        document.querySelectorAll('#atom8ModalBody [data-config-kind="port"]').forEach(input => {
+            target.ports[input.dataset.configId][input.dataset.field] = input.type === 'checkbox' ? input.checked : input.value.trim();
+        });
+        document.querySelectorAll('#atom8ModalBody [data-config-kind="route"]').forEach(input => {
+            target.routes[Number(input.dataset.configId)][input.dataset.field] = input.value.trim();
+        });
+        target.applied = true;
+        if (!isRetryAllowed()) target.locked = true;
+    } else {
+        const target = ex.atom8State.hosts[id];
+        document.querySelectorAll('#atom8ModalBody [data-config-kind="host"]').forEach(input => { target[input.dataset.field] = input.value.trim(); });
+        target.applied = true;
+        if (!isRetryAllowed()) target.locked = true;
+    }
+    atom8Validate(ex);
+    saveSessionProgress();
+    renderAtom8View();
+    updateSummaryPanel();
+    closeAtom8Modal();
+}
+
+function showAtom8Page() {
+    if (!QUESTION_CONFIG.atom8?.enabled || !exerciseData['atom8-main']) return;
+    document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+    document.getElementById('nav-atom8')?.classList.add('active');
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View'].forEach(id => {
+        const view = document.getElementById(id);
+        if (view) view.style.display = 'none';
+    });
+    document.getElementById('atom8View').style.display = 'flex';
+    document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
+    hideAllAtomPaginationBars();
     currentFile = '';
     closeSampleOutputModal();
     updateConsoleDrawerTab(false);
@@ -6951,6 +7595,7 @@ function showDefaultLandingPage() {
 
     const atomPages = [
         ['atom6', showAtom6Page],
+        ['atom8', showAtom8Page],
         ['atom1', showAtom1Page],
         ['atom2', showAtom2Page],
         ['atom3', showAtom3Page],
@@ -6958,7 +7603,9 @@ function showDefaultLandingPage() {
         ['atom5', showAtom5Page]
     ];
     for (const [key, showFn] of atomPages) {
-        const hasQuestions = Object.keys(exerciseData).some(file => file.indexOf(key + '-q') === 0);
+        const hasQuestions = key === 'atom8'
+            ? !!exerciseData['atom8-main']
+            : Object.keys(exerciseData).some(file => file.indexOf(key + '-q') === 0);
         if (hasQuestions) {
             showFn();
             return;
@@ -6977,7 +7624,7 @@ function showDefaultLandingPage() {
     hideAllAtomPaginationBars();
     document.getElementById('subnetVisualizerView').style.display = 'none';
     document.getElementById('atomPlaceholderView').style.display = 'none';
-    ['atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View'].forEach(id => {
+    ['atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View', 'atom8View'].forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
     document.getElementById('exerciseArea').style.display = 'block';
@@ -7002,6 +7649,8 @@ function showSubnetVisualizer() {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('subnetVisualizerView').style.display = 'flex';
 
     hideAllAtomPaginationBars();
@@ -7039,6 +7688,8 @@ function showAtomPage(atomNumber) {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('atomPlaceholderView').style.display = 'block';
     document.getElementById('atomPlaceholderTitle').textContent = `Atom ${atomNumber}`;
 
@@ -7064,6 +7715,8 @@ function switchExercise(name, el) {
     document.getElementById('atom4View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'none';
     document.getElementById('atom6View').style.display = 'none';
+    document.getElementById('atom7View').style.display = 'none';
+    document.getElementById('atom8View').style.display = 'none';
     document.getElementById('exerciseArea').style.display = 'block';
     // The atom pagination bars are direct children of <main> now (real
     // block-level siblings of #contentScrollArea, not nested inside their
@@ -7634,8 +8287,9 @@ function showNotification(message) {
 }
 
 // --- LOCAL SESSION PERSISTENCE (keyed by mode and student email) ---
-// Exam and Practice use separate records. Practice also stores its seed so
-// seeded questions are rebuilt exactly before exercise state is restored.
+// Exam and Practice use separate per-student records. Both store every seed
+// before serialized answers/progress so the exact activity can be rebuilt
+// before its saved state is restored.
 function getExamStorageKey(email) {
     return `examSession_${appSettings.practiceQuestionMode}_${email}`;
 }
@@ -7664,9 +8318,11 @@ function saveSessionProgress() {
 
     const session = {
         schemaVersion: LOCAL_SESSION_SCHEMA_VERSION,
+        studentEmail: currentUser,
         mode: appSettings.mode,
         practiceQuestionMode: appSettings.practiceQuestionMode,
         practiceSeed: currentQuestionSeed,
+        atom7Seed: currentAtom7Seed,
         persistenceEnabled: appSettings.persistenceEnabled,
         timerEnabled: appSettings.timerEnabled,
         timerMinutes: isTimerActive ? appSettings.timerMinutes : null,
@@ -7693,7 +8349,8 @@ function loadExamSession(email) {
     try {
         const raw = localStorage.getItem(getExamStorageKey(email));
         const session = raw ? JSON.parse(raw) : null;
-        return session && session.schemaVersion === LOCAL_SESSION_SCHEMA_VERSION ? session : null;
+        const matchesStudent = !session?.studentEmail || session.studentEmail === email;
+        return session && matchesStudent && session.mode === 'exam' && session.schemaVersion === LOCAL_SESSION_SCHEMA_VERSION ? session : null;
     } catch (e) {
         console.warn('Could not load exam session progress:', e);
         return null;
@@ -7705,7 +8362,8 @@ function loadPracticeSession(email) {
     try {
         const raw = localStorage.getItem(getPracticeStorageKey(email));
         const session = raw ? JSON.parse(raw) : null;
-        return session && session.mode === 'practice' && session.schemaVersion === LOCAL_SESSION_SCHEMA_VERSION ? session : null;
+        const matchesStudent = !session?.studentEmail || session.studentEmail === email;
+        return session && matchesStudent && session.mode === 'practice' && session.schemaVersion === LOCAL_SESSION_SCHEMA_VERSION ? session : null;
     } catch (e) {
         console.warn('Could not load Practice session progress:', e);
         return null;

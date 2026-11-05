@@ -986,6 +986,422 @@ body, html {
     gap: 18px;
 }
 
+.atom7-brief-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.atom7-brief-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.atom7-brief-heading > div {
+    flex: 1;
+}
+
+.atom7-brief-heading span:first-child {
+    color: var(--task-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.atom7-brief-heading h2 {
+    margin: 5px 0 6px;
+    color: var(--text-main);
+}
+
+.atom7-brief-heading p {
+    max-width: 760px;
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.atom7-readonly-badge {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 7px;
+    padding: 8px 11px;
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.12);
+    color: #c7d2fe !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+.atom7-deliverables {
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.atom7-deliverables h3 {
+    margin: 0 0 12px;
+    color: var(--text-main);
+    font-size: 1rem;
+}
+
+.atom7-deliverables ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.atom7-deliverables li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.atom7-deliverables li i {
+    margin-top: 3px;
+    color: var(--host);
+}
+
+/* Atom 8 — interactive VLSM deployment */
+.atom8-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.atom8-panel > .panel-head > div {
+    flex: 1;
+}
+
+.atom8-panel > .panel-head h2,
+.atom8-panel > .panel-head p {
+    margin: 0;
+}
+
+.atom8-panel > .panel-head p {
+    margin-top: 4px;
+    color: var(--text-secondary);
+}
+
+.atom8-topology {
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.62);
+    overflow-x: auto;
+}
+
+.atom8-wan-links {
+    display: grid;
+    gap: 10px;
+    min-width: 760px;
+    margin-bottom: 18px;
+}
+
+.atom8-wan-link {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(170px, 1.5fr) minmax(190px, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.atom8-serial-line {
+    position: relative;
+    height: 3px;
+    border-top: 3px dashed #a5b4fc;
+    text-align: center;
+}
+
+.atom8-serial-line span {
+    position: relative;
+    top: -13px;
+    padding: 0 8px;
+    background: #111827;
+    color: #c7d2fe;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.atom8-router-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(250px, 1fr));
+    gap: 16px;
+    min-width: 900px;
+}
+
+.atom8-router-site {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.atom8-device-button {
+    position: relative;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.atom8-device-button:hover,
+.atom8-device-button:focus-visible {
+    border-color: var(--task-accent);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.atom8-router-button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 4px 10px;
+    min-height: 78px;
+    padding: 14px;
+    border-color: rgba(59, 130, 246, 0.55);
+    text-align: left;
+}
+
+.atom8-router-button > i {
+    grid-row: 1 / 3;
+    color: #93c5fd;
+    font-size: 1.45rem;
+}
+
+.atom8-router-button small,
+.atom8-host-button small {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+}
+
+.atom8-router-lans {
+    display: grid;
+    gap: 12px;
+}
+
+.atom8-lan-branch {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(30, 41, 59, 0.55);
+}
+
+.atom8-port-overlay {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(129, 140, 248, 0.3);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.86);
+}
+
+.atom8-port-overlay > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.atom8-port-overlay strong {
+    color: #c7d2fe;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+}
+
+.atom8-port-overlay small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.atom8-status-dot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 10px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.12);
+}
+
+.atom8-status-dot.green {
+    background: var(--host);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.atom8-status-dot.red {
+    background: var(--network-id);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.atom8-router-button > .atom8-status-dot,
+.atom8-host-button > .atom8-status-dot {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+}
+
+.atom8-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    border-left: 3px solid #fbbf24;
+    color: var(--text-main);
+}
+
+.atom8-switch i {
+    color: #fbbf24;
+}
+
+.atom8-switch small {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+}
+
+.atom8-host-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.atom8-host-button {
+    display: flex;
+    min-height: 92px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 12px 8px;
+    border-color: rgba(16, 185, 129, 0.42);
+    text-align: center;
+}
+
+.atom8-host-button > i {
+    color: var(--host);
+    font-size: 1.2rem;
+}
+
+.atom8-config-modal {
+    width: min(920px, calc(100vw - 32px));
+    max-height: min(84vh, 820px);
+    overflow: hidden;
+}
+
+.atom8-modal-body {
+    max-height: calc(84vh - 150px);
+    overflow-y: auto;
+    padding: 18px 22px;
+}
+
+.atom8-config-group {
+    margin: 0 0 14px;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.atom8-config-group legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 7px;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.atom8-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.atom8-form-grid label:not(.atom8-checkbox) {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.atom8-form-grid input[type="text"] {
+    width: 100%;
+    padding: 10px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--background);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+}
+
+.atom8-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    align-self: end;
+    min-height: 39px;
+    color: var(--text-main);
+    font-size: 0.78rem;
+}
+
+.atom8-route-heading {
+    margin: 22px 0 12px;
+}
+
+.atom8-route-heading h3,
+.atom8-route-heading p,
+.atom8-modal-context {
+    margin: 0;
+}
+
+.atom8-route-heading p,
+.atom8-modal-context {
+    margin-top: 4px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+@media (max-width: 700px) {
+    .atom8-wan-link {
+        grid-template-columns: 1fr;
+    }
+    .atom8-serial-line {
+        margin: 10px 0;
+    }
+    .atom8-switch {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .atom8-switch small {
+        width: 100%;
+        margin-left: 24px;
+    }
+}
+
 .atom6-q-panel {
     display: flex;
     flex-direction: column;

@@ -56,8 +56,10 @@ The implemented Atom sequence is a scaffold from constraints to application:
 4. **Atom 4 — The Boundaries:** derive network and broadcast boundaries.
 5. **Atom 5 — Applied Scenarios:** answer narrative problems spanning subnet counts, hosts, borrowed bits, masks, addresses, and subnet membership.
 6. **Atom 6 — VLSM Planning:** arrange LAN and WAN requirements, then allocate each subnet incrementally from the network state created by the preceding correct allocation.
+7. **Atom 7 — Packet Tracer Design:** receive one persistent, read-only VLSM requirement, complete the plan outside the app, and implement and test it in Packet Tracer.
+8. **Atom 8 — In-App Deployment:** apply that same external design to interactive routers and representative hosts, using static routes and automatic scored validation.
 
-The current activity profile hides Atoms 1–5 and presents Atom 6 only. Their code and configuration remain available for future profiles.
+The current activity profile hides Atoms 1–5 and presents Atoms 6–8. Their code and configuration remain available for future profiles.
 
 The practice-only Subnet Visualizer supports discovery through six linked panels: address/class detection, CIDR bit boundary, mask comparison, subnet permutations, host-range inspection, and classful/classless comparison.
 
@@ -71,6 +73,8 @@ The practice-only Subnet Visualizer supports discovery through six linked panels
 - Configurable question counts and allowed address classes.
 - Configuration-driven curriculum and session defaults that can be manually edited without changing core logic.
 - Atom 6 VLSM volume practice with question pagination, generated labeled network topology, progressive source-subnet state, decimal IPv4 inputs, field-level validation, and a shared WAN source subnet.
+- Atom 7 single-scenario Class C Packet Tracer requirement generation with an independent persistent seed, generated topology, department LAN requirements, and no inputs or scoring.
+- Atom 8 scored in-app deployment of the same Atom 7 scenario, with 2–3 representative hosts per LAN, router/host configuration modals, static routes, port-address overlays, and automatic gray/green/red validation.
 - Optional legacy conversion phases for decimal, binary, IP, mask, and classful CIDR work; disabled in the checked-in configuration.
 - Optional mode-independent timer with warning and critical states.
 - Configurable local persistence for Practice and Exam seeds, answers, scores, locks, and optional deadlines.
@@ -103,6 +107,12 @@ The practice-only Subnet Visualizer supports discovery through six linked panels
 | Atom 6 requirements | Foundation: 3 LANs + 1 WAN; intermediate: 4 + 2; advanced: 5 + 3 |
 | Atom 6 topology capacity | Configured per level; maximum 2 LAN ports and 2 WAN ports per router |
 | Atom 6 parent networks | Configured Class C `/24`; randomized first three octets; excludes `192.168` |
+| Atom 7 | One read-only, ungraded Packet Tracer performance task per student session |
+| Atom 7 topology | 3 routers in a chain; 5 LANs distributed `[2, 1, 2]`; 2 serial WANs |
+| Atom 7 parent network | Configured Class C `/24` pool; excludes the familiar `192.168` range |
+| Atom 8 | Scored in-app implementation of Atom 7's exact seeded scenario |
+| Atom 8 routing | Static routes only; switches require no configuration |
+| Atom 8 representative hosts | Configurable 2–3 per LAN, independent of the LAN host-capacity requirement |
 | Strict binary width | Enabled |
 
 Atom 6 awards one point for correct ordering, one for every completed LAN allocation, and one for the shared WAN allocation stage. The denominator is generated from each scenario rather than hardcoded in the UI.

@@ -10,7 +10,7 @@ index.html
   ├─ sidebar + score summary
   ├─ generic exercise host
   ├─ six-panel visualizer
-  └─ five Atom view hosts + pagination
+  └─ eight Atom view hosts + pagination for multi-question Atoms
 
 styles.css
   ├─ shared tokens/layout/components
@@ -43,6 +43,7 @@ The supported customization boundary is the configuration block, not the core en
 - question and subtype counts;
 - bit widths, numeric ranges, and CIDR pools;
 - allowed address classes;
+- VLSM topology, parent-pool, LAN-profile, label, and seed settings;
 - answer-format strictness;
 - default mode, timer, practice seed mode, and sample-output behavior.
 

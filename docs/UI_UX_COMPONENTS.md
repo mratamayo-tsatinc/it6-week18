@@ -8,7 +8,7 @@ The application has three top-level states:
 2. **Learning/assessment shell:** responsive sidebar, running score, timer, content area, optional console drawer, and question pager.
 3. **Completion:** score summary with identity, earned/possible score, status copy, and QR result.
 
-Within the shell, content switches among the ungraded Subnet Visualizer, Atoms 1–5, and optional generic conversion exercises. Practice and exam share most components but change the available tools, aids, reset behavior, and landing page.
+Within the shell, content switches among the ungraded Subnet Visualizer, Atoms 1–8, and optional generic conversion exercises. Atom 7 is a read-only, ungraded performance-task brief; Atom 8 applies the same scenario through interactive device modals and automatic scoring. Practice and exam share most components, with mode controlling retry availability only.
 
 ## 2. Design tokens
 

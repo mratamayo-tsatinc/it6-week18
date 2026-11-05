@@ -62,8 +62,10 @@ Enable a student to learn and demonstrate classful IPv4 subnetting through repro
 | GEN-03 | Every module and subtype can be enabled, counted, and difficulty-constrained. | Implemented | Disabled/zero-count content generates no cards; allowed A/B/C classes are respected. |
 | GEN-03A | Curriculum parameters must remain separate from the core application logic. | Implemented | A user can alter enabled content, counts, ranges, CIDR pools, allowed classes, and answer strictness in the configuration section without editing generators, graders, or renderers. |
 | GEN-04 | Random generation must never produce invalid, impossible, or duplicate-heavy assessments. | Partial | Bounds exist, but no automated property-based coverage or duplicate threshold is present. |
-| CURR-01 | The system supports configurable Atoms 1–6 and optional conversion phases 1–7. | Implemented | Enabled content appears, is graded, contributes to totals, and participates in persistence; the current profile exposes Atom 6 only. |
+| CURR-01 | The system supports configurable Atoms 1–8 and optional conversion phases 1–7. | Implemented | Enabled scored content contributes to totals; enabled ungraded content is clearly labeled and excluded from scoring. The current profile exposes Atoms 6–8. |
 | CURR-01A | Atom 6 provides incrementally arranged VLSM planning practice. | Implemented | Foundation scenarios use 3 LANs + 1 WAN, intermediate uses 4 + 2, and advanced uses 5 + 3. Router count, LANs per router, and adjacent point-to-point WAN pairs come from seeded level configuration; the renderer shows those relationships without exceeding two LAN or two WAN ports per router. |
+| CURR-01B | Atom 7 generates one persistent, read-only Packet Tracer performance-task requirement. | Implemented | The requirement uses a configured Class C `/24`, 3-router chain, 5 department LANs distributed `[2, 1, 2]`, and 2 point-to-point WANs. It exposes no inputs or score and restores the same scenario seed for that student session when persistence is enabled. Atom 8 consumes the same seeded scenario. |
+| CURR-01C | Atom 8 provides a scored in-app implementation of Atom 7's seeded design requirement. | Implemented | Students configure router LAN/WAN interfaces, DCE clocking, representative hosts, and static routes through device modals. Applying a configuration automatically validates, updates gray/green/red status dots and port overlays, recalculates the score, and persists progress. Switches expose no configuration. |
 | CURR-02 | The curriculum copy must state that classful addressing is a teaching abstraction. | Planned | An orientation/about surface includes this context without distracting from the activity. |
 
 ### Practice and learning support
@@ -91,8 +93,9 @@ Enable a student to learn and demonstrate classful IPv4 subnetting through repro
 
 | ID | Requirement | Status | Acceptance criteria |
 |---|---|---|---|
-| DATA-01 | Local persistence can be enabled independently in either mode. | Implemented | Seed, locks, score, answers/order, completion, and optional deadline restore from mode-separated per-student `localStorage` records. |
+| DATA-01 | Local persistence can be enabled independently in either mode. | Implemented | Practice and Exam each restore their own per-student question seed, Atom 7/8 requirement seed, serialized answers and device configurations, progress, locks, score, completion state, and optional deadline from mode-separated `localStorage` records. |
 | DATA-02 | Persistence can be disabled without changing activity mode. | Implemented | With persistence off, progress and seeds are not read from or written to activity-session records. |
+| DATA-03 | Atom 7's generated requirement remains stable for the student session. | Implemented | Its independent configurable seed is saved with the local session and regenerates the same parent network, labels, requirements, and topology on reload. |
 | DATA-03 | Students can export a per-exercise CSV. | Implemented | Download includes student, display label, and earned/possible score for each generated exercise. |
 | DATA-04 | A QR result can be generated from the current or final total. | Implemented with security limitation | QR opens the configured result page and carries email, timestamp, and score in an encrypted client-generated token. |
 | DATA-05 | High-stakes results must be verifiable and tamper-evident. | Planned | Result tokens are signed by a trusted server and the verifier checks attempt identity, score, and issuance. |

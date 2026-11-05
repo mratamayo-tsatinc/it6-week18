@@ -1,6 +1,6 @@
 # SubnetAcad v2
 
-SubnetAcad v2 is a pure front-end, browser-based IPv4 subnetting learning and assessment application. It combines a six-panel subnet visualizer with configurable scored learning modules ("Atoms"), deterministic question generation, retryable Practice and single-attempt Exam modes, optional timing, configurable browser persistence, CSV export, and QR-based result sharing.
+SubnetAcad v2 is a pure front-end, browser-based IPv4 subnetting learning and assessment application. It combines a six-panel subnet visualizer with configurable scored and ungraded learning modules ("Atoms"), deterministic scenario generation, retryable Practice and single-attempt Exam modes, optional timing, configurable browser persistence, CSV export, and QR-based result sharing.
 
 The application is intentionally lightweight: `index.html`, `styles.css`, and `script.js` run directly in the browser without a package manager, compilation step, application server, or database. Its behavior is configuration-driven: users can change the dedicated configuration values near the top of `script.js` without altering the core generation, grading, rendering, navigation, or persistence logic.
 
@@ -33,7 +33,7 @@ Then open `http://localhost:8000`. Opening `index.html` directly with `file://` 
 
 ## Current configuration
 
-The checked-in configuration defaults to Practice mode with the timer disabled and local persistence enabled. Legacy conversion phases 1–7 and Atoms 1–5 are disabled; Atom 6 is the only visible Atom. It provides ten incrementally arranged VLSM planning scenarios using configurable Class C `/24` parent pools, progressing from 3 LANs + 1 WAN to 5 LANs + 3 WANs. Each level configures its router count, LAN-port distribution, and serial-WAN router pairs; routers form a simple chain with one point-to-point WAN between adjacent routers.
+The checked-in configuration defaults to Practice mode with the timer disabled and local persistence enabled. Practice and Exam maintain separate per-student local sessions containing their seeds, answers, progress, locks, and scores. Legacy conversion phases 1–7 and Atoms 1–5 are disabled. Atom 6 provides ten incrementally arranged, scored VLSM planning scenarios using configurable Class C `/24` parent pools, progressing from 3 LANs + 1 WAN to 5 LANs + 3 WANs. Atom 7 provides one persistent, ungraded Class C `/24` Packet Tracer design brief with 3 routers, 5 department LANs distributed `[2, 1, 2]`, and 2 adjacent serial WANs. Atom 8 reuses that exact seeded requirement for a scored in-app implementation activity with configurable router ports, representative hosts, static routes, automatic validation, and port-status overlays. All topology and seed parameters are configured near the top of `script.js`.
 
 ## Configuration model
 
@@ -43,6 +43,7 @@ Curriculum and session parameters are intentionally separated from the core appl
 - question counts and Atom 5 subtype counts;
 - decimal ranges, binary widths, and allowed CIDR values;
 - allowed IPv4 address classes per activity;
+- Atom 6–8 topology, address-pool, LAN-profile, naming, seed, interface, representative-host, and scoring parameters;
 - strict binary-answer formatting;
 - default Practice/Exam mode, timer duration, practice seeding, and sample-output behavior.
 
