@@ -10,6 +10,8 @@ The application has three top-level states:
 
 Within the shell, content switches among the ungraded Subnet Visualizer, Atoms 1–8, and optional generic conversion exercises. Atom 7 is a read-only, ungraded performance-task brief; Atom 8 applies the same scenario through interactive device modals and automatic scoring. Practice and exam share most components, with mode controlling retry availability only.
 
+Atom 8 router configuration uses a Packet Tracer-style workspace: a persistent side navigation lists each LAN/WAN interface and its validation dot, selecting an interface opens its dedicated IPv4 settings panel, and Static Routing has a separate navigation destination. Switches remain non-configurable.
+
 ## 2. Design tokens
 
 The canonical values live in `:root` in `styles.css`.

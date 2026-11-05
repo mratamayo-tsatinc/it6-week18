@@ -74,7 +74,7 @@ The practice-only Subnet Visualizer supports discovery through six linked panels
 - Configuration-driven curriculum and session defaults that can be manually edited without changing core logic.
 - Atom 6 VLSM volume practice with question pagination, generated labeled network topology, progressive source-subnet state, decimal IPv4 inputs, field-level validation, and a shared WAN source subnet.
 - Atom 7 single-scenario Class C Packet Tracer requirement generation with an independent persistent seed, generated topology, department LAN requirements, and no inputs or scoring.
-- Atom 8 scored in-app deployment of the same Atom 7 scenario, with 2–3 representative hosts per LAN, router/host configuration modals, static routes, port-address overlays, and automatic gray/green/red validation.
+- Atom 8 scored in-app deployment of the same Atom 7 scenario, with 2–3 representative hosts per LAN, Packet Tracer-style router side navigation with dedicated port settings, host configuration modals, static routes, port-address overlays, and automatic gray/green/red validation.
 - Optional legacy conversion phases for decimal, binary, IP, mask, and classful CIDR work; disabled in the checked-in configuration.
 - Optional mode-independent timer with warning and critical states.
 - Configurable local persistence for Practice and Exam seeds, answers, scores, locks, and optional deadlines.

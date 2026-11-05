@@ -6658,16 +6658,29 @@ function atom8OpenRouterModal(routerId) {
     const router = ex.model.routers.find(item => item.id === routerId);
     const state = ex.atom8State.routers[routerId];
     const disabled = !!state.locked;
-    const ports = router.ports.map(port => {
+    const portNav = router.ports.map((port, index) => {
+        const status = ex.atom8State.validation.ports[routerId + ':' + port.id] || 'gray';
+        return '<button type="button" role="tab" class="atom8-config-nav-btn' + (index === 0 ? ' active' : '') + '" data-config-panel="port-' + port.id + '" aria-selected="' + (index === 0 ? 'true' : 'false') + '">' +
+            atom8StatusDot(status) + '<span><strong>' + atom6Escape(port.name) + '</strong><small>' + (port.role === 'lan' ? 'LAN Interface' : 'Serial WAN Interface') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
+    }).join('');
+    const portPanels = router.ports.map((port, index) => {
         const input = state.ports[port.id];
-        return '<fieldset class="atom8-config-group"><legend>' + atom8StatusDot(ex.atom8State.validation.ports[routerId + ':' + port.id] || 'gray') + atom6Escape(port.name) + ' · ' + port.role.toUpperCase() + '</legend><div class="atom8-form-grid">' +
+        const status = ex.atom8State.validation.ports[routerId + ':' + port.id] || 'gray';
+        return '<section role="tabpanel" class="atom8-config-panel' + (index === 0 ? ' active' : '') + '" data-config-panel-content="port-' + port.id + '"' + (index === 0 ? '' : ' hidden') + '>' +
+            '<div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid ' + (port.role === 'lan' ? 'fa-ethernet' : 'fa-arrows-left-right') + '" aria-hidden="true"></i></div><div><span>' + port.role.toUpperCase() + ' PORT SETTINGS</span><h3>' + atom6Escape(port.name) + '</h3><p>' + (port.role === 'lan' ? 'Configure the gateway interface for its connected LAN.' : 'Configure this endpoint of the point-to-point serial connection.') + '</p></div>' + atom8StatusDot(status) + '</div>' +
+            '<fieldset class="atom8-config-group"><legend>IPv4 Configuration</legend><div class="atom8-form-grid">' +
             atom8Input('IPv4 Address', 'port', port.id, 'ip', input.ip, disabled) + atom8Input('Subnet Mask', 'port', port.id, 'mask', input.mask, disabled) +
             (port.dce ? atom8Input('DCE Clock Rate', 'port', port.id, 'clockRate', input.clockRate, disabled) : '') +
-            '<label class="atom8-checkbox"><input type="checkbox" data-config-kind="port" data-config-id="' + port.id + '" data-field="enabled"' + (input.enabled ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>Port enabled</span></label></div></fieldset>';
+            '<label class="atom8-checkbox"><input type="checkbox" data-config-kind="port" data-config-id="' + port.id + '" data-field="enabled"' + (input.enabled ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>Port enabled</span></label></div></fieldset>' +
+            (port.dce ? '<div class="atom8-interface-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>This is the configured DCE endpoint. Its clock rate must match the activity setting.</span></div>' : '') + '</section>';
     }).join('');
     const routes = state.routes.map((route, i) => '<fieldset class="atom8-config-group"><legend>Static Route ' + (i + 1) + '</legend><div class="atom8-form-grid">' +
         atom8Input('Destination Network', 'route', i, 'destination', route.destination, disabled) + atom8Input('Subnet Mask', 'route', i, 'mask', route.mask, disabled) + atom8Input('Next-Hop Address', 'route', i, 'nextHop', route.nextHop, disabled) + '</div></fieldset>').join('');
-    atom8ShowModal('Router ' + router.number + ' Configuration', ports + '<div class="atom8-route-heading"><h3>Static Routes</h3><p>Enter one route for every remote LAN.</p></div>' + routes, 'router', routerId, disabled);
+    const routeStatus = ex.atom8State.validation.routes[routerId] || 'gray';
+    const routeNav = '<button type="button" role="tab" class="atom8-config-nav-btn atom8-route-nav" data-config-panel="static-routes" aria-selected="false">' + atom8StatusDot(routeStatus) + '<span><strong>Static Routing</strong><small>' + router.routeCount + ' remote LAN route' + (router.routeCount === 1 ? '' : 's') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
+    const routePanel = '<section role="tabpanel" class="atom8-config-panel" data-config-panel-content="static-routes" hidden><div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div><div><span>ROUTING SETTINGS</span><h3>Static Routes</h3><p>Enter one route for every remote LAN using its destination network, mask, and next hop.</p></div>' + atom8StatusDot(routeStatus) + '</div>' + routes + '</section>';
+    const body = '<div class="atom8-router-config-shell"><aside class="atom8-config-side-nav"><div class="atom8-device-summary"><i class="fa-solid fa-router" aria-hidden="true"></i><span><strong>Router ' + router.number + '</strong><small>Configuration</small></span></div><div class="atom8-config-nav-label">Interfaces</div><div class="atom8-config-nav-list" role="tablist" aria-label="Router settings">' + portNav + '</div><div class="atom8-config-nav-label">Routing</div><div class="atom8-config-nav-list" role="tablist">' + routeNav + '</div></aside><div class="atom8-config-workspace">' + portPanels + routePanel + '</div></div>';
+    atom8ShowModal('Router ' + router.number + ' Configuration', body, 'router', routerId, disabled);
 }
 
 function atom8OpenHostModal(hostId) {
@@ -6708,6 +6721,21 @@ function atom8HandleDeviceClick(event) {
 
 function atom8HandleModalClick(event) {
     if (event.target.closest('.atom8-modal-close')) { closeAtom8Modal(); return; }
+    const panelButton = event.target.closest('.atom8-config-nav-btn');
+    if (panelButton) {
+        const modal = document.getElementById('atom8ConfigModal');
+        modal.querySelectorAll('.atom8-config-nav-btn').forEach(button => {
+            const active = button === panelButton;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        modal.querySelectorAll('.atom8-config-panel').forEach(panel => {
+            const active = panel.dataset.configPanelContent === panelButton.dataset.configPanel;
+            panel.classList.toggle('active', active);
+            panel.hidden = !active;
+        });
+        return;
+    }
     if (!event.target.closest('#atom8ApplyConfig')) return;
     const modal = document.getElementById('atom8ConfigModal');
     const ex = exerciseData['atom8-main'];
