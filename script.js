@@ -172,7 +172,7 @@ const QUESTION_CONFIG = {
     // the generic generator derives LAN/WAN requirements, subnet sizes,
     // parent-network fit, allocation stages, and validation keys.
     atom6: {
-        enabled: false,
+        enabled: true,
         minLans: 3,
         maxLans: 5,
         minWans: 1,
@@ -184,8 +184,12 @@ const QUESTION_CONFIG = {
             maxWanPortsPerRouter: 2
         },
         wanRequirement: {
-            requiredIp: 2,
+            requiredUsableIp: 2,
             allocationCidr: 30,
+            // Every WAN is an individual network. All WAN /30 blocks must
+            // come from the first remaining subnet large enough to produce
+            // the complete configured WAN set; smaller subnets are skipped
+            // and remain available.
             useSharedSourceSubnet: true,
             equivalentOrdering: true
         },
@@ -264,7 +268,7 @@ const QUESTION_CONFIG = {
             maxWanPortsPerRouter: 2
         },
         wanRequirement: {
-            requiredIp: 2,
+            requiredUsableIp: 2,
             allocationCidr: 30,
             useSharedSourceSubnet: true,
             equivalentOrdering: true
@@ -312,8 +316,10 @@ const QUESTION_CONFIG = {
     // checks capacity, containment, uniqueness, gateways, WANs, and static
     // routes instead of comparing against Atom 6's canonical allocation.
     atom8: {
-        enabled: false,
+        enabled: true,
         representativeHosts: { min: 2, max: 3 },
+        initialRouteEntries: 1,
+        maxStaticRoutesPerRouter: 12,
         wanCidr: 30,
         dceClockRate: 64000,
         routing: 'static',
@@ -322,10 +328,20 @@ const QUESTION_CONFIG = {
             ['GigabitEthernet0/0'],
             ['GigabitEthernet0/0', 'GigabitEthernet0/1']
         ],
+        lanInterfaceShortNames: [
+            ['Ga0/0', 'Ga0/1'],
+            ['Ga0/0'],
+            ['Ga0/0', 'Ga0/1']
+        ],
         wanInterfaceNames: [
             ['Serial0/0/0'],
             ['Serial0/0/0', 'Serial0/0/1'],
             ['Serial0/0/0']
+        ],
+        wanInterfaceShortNames: [
+            ['Se0/0/0'],
+            ['Se0/0/0', 'Se0/0/1'],
+            ['Se0/0/0']
         ],
         dceRouterByWan: [1, 2],
         scoring: {
@@ -2446,6 +2462,7 @@ function showAtomQuestion(atomKey, index, opts) {
         const container = document.getElementById(atomKey + 'QuestionsContainer');
         if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    if (atomKey === 'atom6') atom6ScheduleTopologyConnections();
 }
 
 // Called once per login, right after a view's panels have been (re)built.
@@ -5530,6 +5547,8 @@ function showAtom5Page() {
 ========================================================= */
 let atom6ActionsDelegated = false;
 let atom6QuestionIds = [];
+let atom6TopologyFrame = null;
+let atom6TopologyResizeBound = false;
 
 function atom6Escape(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -5574,6 +5593,26 @@ function atom6RequiredCidr(requiredHosts) {
     const availableNeeded = Number(requiredHosts) + 2;
     const hostBits = Math.max(2, Math.ceil(Math.log2(availableNeeded)));
     return 32 - hostBits;
+}
+
+function atom6WanAllocationCidr(cfg) {
+    const requiredUsableIp = Number(cfg.wanRequirement.requiredUsableIp ?? cfg.wanRequirement.requiredIp);
+    const configuredCidr = Number(cfg.wanRequirement.allocationCidr);
+    const smallestValidCidr = atom6RequiredCidr(requiredUsableIp);
+    const configuredUsableIp = atom6BlockSize(configuredCidr) - 2;
+    if (!Number.isInteger(requiredUsableIp) || requiredUsableIp < 1 ||
+        !Number.isInteger(configuredCidr) || configuredCidr < 0 || configuredCidr > 30 ||
+        configuredUsableIp < requiredUsableIp ||
+        (cfg.allocation?.requireSmallestValidCidr !== false && configuredCidr !== smallestValidCidr)) {
+        throw new Error('Atom WAN configuration must provide the configured usable IP requirement with the smallest valid CIDR.');
+    }
+    return configuredCidr;
+}
+
+function atom6RequiredSourceCidr(childCidr, childCount) {
+    const count = Number(childCount);
+    if (!Number.isInteger(count) || count < 1) return null;
+    return Number(childCidr) - Math.ceil(Math.log2(count));
 }
 
 function atom6Block(network, cidr) {
@@ -5675,12 +5714,14 @@ function atom6BuildTopology(level, cfg, rng) {
 
     const wans = Array.from({ length: wanTotal }, (_, i) => {
         const pair = wanRouterPairs[i];
+        const requiredIp = Number(cfg.wanRequirement.requiredUsableIp ?? cfg.wanRequirement.requiredIp);
         const wan = {
             id: 'wan-' + (i + 1), type: 'wan', number: i + 1,
             label: 'WAN ' + (i + 1),
             fromRouterId: routers[pair[0]].id,
             toRouterId: routers[pair[1]].id,
-            requiredIp: Number(cfg.wanRequirement.requiredIp)
+            requiredIp,
+            requiredCidr: atom6WanAllocationCidr(cfg)
         };
         routers[pair[0]].wanIds.push(wan.id);
         routers[pair[1]].wanIds.push(wan.id);
@@ -5707,11 +5748,16 @@ function atom6AllocateScenario(parent, topology, cfg) {
         lanAllocations.push({ lanId: lan.id, source, assigned, generated: children, poolAfter: pool.map(b => ({ ...b })) });
     }
 
-    const linkCidr = Number(cfg.wanRequirement.allocationCidr);
+    const linkCidr = atom6WanAllocationCidr(cfg);
     const linkCount = topology.wans.length;
+    const requiredSourceCidr = atom6RequiredSourceCidr(linkCidr, linkCount);
     pool.sort((a, b) => a.networkInt - b.networkInt);
-    const sourceIndex = pool.findIndex(block => block.cidr <= linkCidr && Math.pow(2, linkCidr - block.cidr) >= linkCount);
+    // Select by address order, but only when one source can produce the full
+    // WAN set. For example, six /30 WAN networks require at least a /27;
+    // an earlier /28 (four /30s) is left untouched and the search continues.
+    const sourceIndex = pool.findIndex(block => block.cidr <= requiredSourceCidr);
     if (sourceIndex < 0) return null;
+    const skippedBeforeSource = pool.slice(0, sourceIndex).map(block => ({ ...block }));
     const source = pool.splice(sourceIndex, 1)[0];
     const generated = atom6Children(source, linkCidr);
     if (generated.length < linkCount) return null;
@@ -5722,7 +5768,16 @@ function atom6AllocateScenario(parent, topology, cfg) {
     return {
         sortedLans,
         lanAllocations,
-        wan: { source, generated, assignments, poolAfter: pool.map(b => ({ ...b })) }
+        wan: {
+            source,
+            generated,
+            assignments,
+            requiredSourceCidr,
+            requiredBlockCount: linkCount,
+            sourceBlockCapacity: generated.length,
+            skippedBeforeSource,
+            poolAfter: pool.map(b => ({ ...b }))
+        }
     };
 }
 
@@ -5784,6 +5839,7 @@ function atom6InitialState(scenario) {
     return {
         order: [...scenario.initialOrder],
         orderComplete: false,
+        allocationLanIds: [],
         orderFeedback: '',
         completedLanCount: 0,
         lanInputs: scenario.solution.lanAllocations.map(() => ({
@@ -5795,6 +5851,7 @@ function atom6InitialState(scenario) {
             links: scenario.wans.map(() => ({ network: atom6EmptyIp(), first: atom6EmptyIp(), last: atom6EmptyIp(), broadcast: atom6EmptyIp() }))
         },
         wanFeedback: {},
+        wanAssignmentIndices: [],
         wanComplete: false,
         message: ''
     };
@@ -5804,7 +5861,13 @@ function atom6RestoreState(ex) {
     if (!ex || !ex.userAnswer) return ex.atom6State || atom6InitialState(ex.scenario);
     try {
         const parsed = JSON.parse(ex.userAnswer);
-        if (parsed && Array.isArray(parsed.order) && Array.isArray(parsed.lanInputs)) return parsed;
+        if (parsed && Array.isArray(parsed.order) && Array.isArray(parsed.lanInputs)) {
+            if (!Array.isArray(parsed.allocationLanIds)) {
+                parsed.allocationLanIds = parsed.orderComplete ? parsed.order.filter(id => ex.scenario.lans.some(lan => lan.id === id)) : [];
+            }
+            if (!Array.isArray(parsed.wanAssignmentIndices)) parsed.wanAssignmentIndices = [];
+            return parsed;
+        }
     } catch (err) {
         console.warn('Could not restore Atom 6 state:', err);
     }
@@ -5851,6 +5914,15 @@ function atom6ValidateOrder(scenario, order) {
     return true;
 }
 
+function atom6OrderedLans(ex) {
+    const ids = ex.atom6State?.allocationLanIds;
+    if (Array.isArray(ids) && ids.length === ex.scenario.lans.length) {
+        const ordered = ids.map(id => ex.scenario.lans.find(lan => lan.id === id));
+        if (ordered.every(Boolean)) return ordered;
+    }
+    return ex.scenario.solution.sortedLans;
+}
+
 function atom6IpValues(value) {
     return String(value).split('.').map(String);
 }
@@ -5888,7 +5960,7 @@ function atom6BlockSummary(block, label) {
 }
 
 function atom6BuildTopologyDiagram(scenario) {
-    const siteWidth = 260;
+    const siteWidth = 280;
     const siteGap = 38;
     const canvasWidth = scenario.routers.length * siteWidth + Math.max(0, scenario.routers.length - 1) * siteGap;
     const routerCenterX = routerIndex => (siteWidth / 2) + routerIndex * (siteWidth + siteGap);
@@ -5929,25 +6001,78 @@ function atom6BuildTopologyDiagram(scenario) {
     const routerCards = scenario.routers.map(router => {
         const routerLans = scenario.lans.filter(lan => lan.routerId === router.id);
         const lanBranches = routerLans.map(lan =>
-            '<div class="atom6-lan-branch" aria-label="LAN ' + lan.number + ' topology">' +
-                '<span class="atom6-wired-line" aria-hidden="true"></span>' +
-                '<div class="atom6-device atom6-switch-device"><i class="fa-solid fa-network-wired" aria-hidden="true"></i><span>Switch</span></div>' +
-                '<span class="atom6-wired-line" aria-hidden="true"></span>' +
-                '<div class="atom6-device atom6-host-device"><i class="fa-solid fa-desktop" aria-hidden="true"></i><span>Host</span></div>' +
+            '<div class="atom6-lan-branch atom6-readonly-lan-branch" data-lan-id="' + lan.id + '" aria-label="LAN ' + lan.number + ' topology">' +
+                '<div class="atom6-device atom6-switch-device" data-lan-id="' + lan.id + '"><i class="fa-solid fa-network-wired" aria-hidden="true"></i><span>Switch</span></div>' +
+                '<div class="atom6-device atom6-host-device" data-lan-id="' + lan.id + '"><i class="fa-solid fa-desktop" aria-hidden="true"></i><span>Host</span></div>' +
                 '<div class="atom6-topology-lan-label"><strong>LAN ' + lan.number + '</strong><span>' + atom6Escape(lan.label) + '</span><small>' + lan.hosts + ' hosts required</small></div>' +
             '</div>'
         ).join('');
-        return '<div class="atom6-topology-site"><div class="atom6-device atom6-router-device"><i class="fa-solid fa-router" aria-hidden="true"></i><span>Router ' + router.number + '</span><small>' + router.lanIds.length + '/2 LAN · ' + router.wanIds.length + '/2 WAN</small></div>' +
-            '<div class="atom6-lan-branches' + (routerLans.length > 1 ? ' has-multiple' : '') + '">' + lanBranches + '</div></div>';
+        return '<div class="atom6-topology-site atom6-readonly-site"><div class="atom6-device atom6-router-device" data-router-id="' + router.id + '"><i class="fa-solid fa-router" aria-hidden="true"></i><span>Router ' + router.number + '</span></div>' +
+            '<div class="atom6-lan-branches atom6-readonly-lan-branches' + (routerLans.length > 1 ? ' has-multiple' : '') + '">' + lanBranches + '</div></div>';
     }).join('');
 
-    return '<section class="atom6-topology" aria-label="Network topology"><div class="atom6-topology-heading"><div><span>Scenario Map</span><h3>Network Topology</h3></div><small>Each router supports up to two LAN ports and two WAN ports. One host icon represents each LAN host requirement.</small></div>' +
+    return '<section class="atom6-topology atom6-readonly-topology" aria-label="Network topology"><div class="atom6-topology-heading"><div><span>Scenario Map</span><h3>Network Topology</h3></div><small>Each router supports up to two LAN ports and two WAN ports. One host icon represents each LAN host requirement.</small></div>' +
         '<div class="atom6-topology-scroll"><div class="atom6-topology-canvas" style="width:' + canvasWidth + 'px"><svg class="atom6-wan-overlay" style="height:' + overlayHeight + 'px" viewBox="0 0 ' + canvasWidth + ' ' + overlayHeight + '" preserveAspectRatio="none" aria-label="Serial WAN connections">' + wanPaths + '</svg><div class="atom6-topology-router-row" style="padding-top:' + routerTop + 'px">' + routerCards + '</div></div></div></section>';
+}
+
+function atom6ScheduleTopologyConnections() {
+    if (!atom6TopologyResizeBound) {
+        atom6TopologyResizeBound = true;
+        window.addEventListener('resize', atom6ScheduleTopologyConnections);
+    }
+    if (atom6TopologyFrame !== null) cancelAnimationFrame(atom6TopologyFrame);
+    atom6TopologyFrame = requestAnimationFrame(() => {
+        atom6TopologyFrame = requestAnimationFrame(() => {
+            atom6TopologyFrame = null;
+            atom6DrawTopologyConnections();
+        });
+    });
+}
+
+function atom6DrawTopologyConnections() {
+    document.querySelectorAll('.atom6-readonly-topology .atom6-topology-canvas').forEach(canvas => {
+        canvas.querySelector('.topology-physical-links')?.remove();
+        if (canvas.offsetWidth === 0) return;
+        const canvasRect = canvas.getBoundingClientRect();
+        const width = canvas.offsetWidth;
+        const height = Math.max(canvas.scrollHeight, canvas.offsetHeight);
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'topology-physical-links');
+        svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+        svg.setAttribute('aria-hidden', 'true');
+        const point = (element, edge, offsetX = 0) => {
+            const rect = element.getBoundingClientRect();
+            return {
+                x: rect.left - canvasRect.left + rect.width / 2 + offsetX,
+                y: (edge === 'top' ? rect.top : rect.bottom) - canvasRect.top
+            };
+        };
+        const addPath = (start, end, className) => {
+            const vertical = Math.max(24, (end.y - start.y) * 0.44);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('class', 'topology-physical-link ' + className);
+            path.setAttribute('d', 'M ' + start.x + ' ' + start.y + ' C ' + start.x + ' ' + (start.y + vertical) + ', ' + end.x + ' ' + (end.y - vertical) + ', ' + end.x + ' ' + end.y);
+            svg.appendChild(path);
+        };
+        canvas.querySelectorAll('.atom6-readonly-site').forEach(site => {
+            const router = site.querySelector('.atom6-router-device');
+            const branches = [...site.querySelectorAll('.atom6-readonly-lan-branch')];
+            branches.forEach((branch, branchIndex) => {
+                const networkSwitch = branch.querySelector('.atom6-switch-device');
+                const host = branch.querySelector('.atom6-host-device');
+                if (!router || !networkSwitch || !host) return;
+                const routerOffset = (branchIndex - (branches.length - 1) / 2) * 22;
+                addPath(point(router, 'bottom', routerOffset), point(networkSwitch, 'top'), 'router-to-switch');
+                addPath(point(networkSwitch, 'bottom'), point(host, 'top'), 'switch-to-host');
+            });
+        });
+        canvas.prepend(svg);
+    });
 }
 
 function atom6BuildScenarioBoard(scenario) {
     const lanCards = scenario.lans.map(lan => '<article class="atom6-requirement-card atom6-lan-card"><div class="atom6-requirement-type">LAN ' + lan.number + '</div><div class="atom6-requirement-name">' + atom6Escape(lan.label) + '</div><strong>' + lan.hosts + ' hosts</strong></article>');
-    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Wide Area Network</div><strong>' + wan.requiredIp + ' IP required</strong></article>');
+    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Wide Area Network</div><strong>' + wan.requiredIp + ' usable IP' + (wan.requiredIp === 1 ? '' : 's') + '</strong></article>');
     return '<section class="atom6-scenario-board" aria-label="VLSM scenario"><div class="atom6-parent-network"><span><small>Primary allocation source</small>Parent Network</span><strong>' + scenario.parent.network + '/' + scenario.parent.cidr + '</strong></div>' +
         atom6BuildTopologyDiagram(scenario) + '<div class="atom6-requirements-heading"><span>Address Requirements</span><h3>LAN and WAN Requirements</h3></div>' +
         '<div class="atom6-requirement-grid">' + lanCards.concat(wanCards).join('') + '</div></section>';
@@ -5956,7 +6081,7 @@ function atom6BuildScenarioBoard(scenario) {
 function atom6BuildProgress(ex) {
     const state = ex.atom6State;
     const steps = [{ label: 'Priority', done: state.orderComplete }]
-        .concat(ex.scenario.solution.sortedLans.map((lan, i) => ({ label: 'LAN ' + (i + 1), done: state.completedLanCount > i })))
+        .concat(atom6OrderedLans(ex).map((lan, i) => ({ label: 'LAN ' + (i + 1), done: state.completedLanCount > i })))
         .concat([{ label: 'WANs', done: state.wanComplete }]);
     let activeFound = false;
     return '<div class="atom6-progress" aria-label="Scenario progress">' + steps.map((step, i) => {
@@ -5969,17 +6094,17 @@ function atom6BuildProgress(ex) {
 function atom6BuildOrdering(qid, ex) {
     const state = ex.atom6State;
     if (state.orderComplete) {
-        return '<section class="atom6-stage atom6-stage-complete"><div class="atom6-stage-head"><span class="panel-index">01</span><div><h3>Allocation Priority</h3><p>LANs are ordered by host requirement. WANs form the final equal-priority group.</p></div><i class="fa-solid fa-circle-check"></i></div></section>';
+        return '<section class="atom6-stage atom6-stage-complete"><div class="atom6-stage-head"><span class="panel-index">01</span><div><h3>Allocation Priority</h3><p>LANs are ordered by host requirement. Equal LAN requirements may exchange positions, and WANs form the final equal-priority group.</p></div><i class="fa-solid fa-circle-check"></i></div></section>';
     }
     const rows = state.order.map((id, i) => {
         const item = atom6ItemById(ex.scenario, id);
-        const requirement = item.type === 'lan' ? item.hosts + ' hosts' : item.requiredIp + ' IP';
+        const requirement = item.type === 'lan' ? item.hosts + ' hosts' : item.requiredIp + ' usable IP' + (item.requiredIp === 1 ? '' : 's');
         const displayLabel = item.type === 'wan' ? item.label : 'LAN ' + item.number + ' · ' + item.label;
         return '<li class="atom6-order-item" data-item-id="' + item.id + '"><span class="atom6-order-position">' + (i + 1) + '</span><div><strong>' + atom6Escape(displayLabel) + '</strong><small>' + requirement + '</small></div>' +
             '<div class="atom6-order-actions"><button type="button" class="atom6-move-btn" data-qid="' + qid + '" data-index="' + i + '" data-direction="-1" aria-label="Move up"' + ((i === 0 || ex.locked) ? ' disabled' : '') + '><i class="fa-solid fa-arrow-up"></i></button>' +
             '<button type="button" class="atom6-move-btn" data-qid="' + qid + '" data-index="' + i + '" data-direction="1" aria-label="Move down"' + ((i === state.order.length - 1 || ex.locked) ? ' disabled' : '') + '><i class="fa-solid fa-arrow-down"></i></button></div></li>';
     }).join('');
-    return '<section class="atom6-stage"><div class="atom6-stage-head"><span class="panel-index">01</span><div><h3>Arrange Allocation Priority</h3><p>Place LANs from largest to smallest. Keep all WANs last; their relative order does not matter.</p></div></div>' +
+    return '<section class="atom6-stage"><div class="atom6-stage-head"><span class="panel-index">01</span><div><h3>Arrange Allocation Priority</h3><p>Place LANs from largest to smallest. LANs with the same host requirement may exchange positions. Keep all WANs last; their relative order does not matter.</p></div></div>' +
         '<ol class="atom6-order-list">' + rows + '</ol><div class="atom6-stage-actions"><button type="button" class="primary-btn atom6-check-order" data-qid="' + qid + '"' + (ex.locked ? ' disabled' : '') + '>Check Priority</button>' +
         '<div class="atom6-inline-feedback ' + (state.orderFeedback ? 'incorrect' : '') + '" role="status">' + atom6Escape(state.orderFeedback) + '</div></div></section>';
 }
@@ -5996,8 +6121,9 @@ function atom6AllocationTable(qid, scope, index, inputs, feedback, block, linkLa
 
 function atom6BuildCompletedLans(ex) {
     if (!ex.atom6State.completedLanCount) return '';
+    const orderedLans = atom6OrderedLans(ex);
     const rows = ex.scenario.solution.lanAllocations.slice(0, ex.atom6State.completedLanCount).map((allocation, i) => {
-        const lan = ex.scenario.solution.sortedLans[i];
+        const lan = orderedLans[i];
         return '<tr><td>' + (i + 1) + '</td><td><strong>LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + '</strong><small>' + lan.hosts + ' hosts</small></td><td>' + allocation.assigned.network + '/' + allocation.assigned.cidr + '</td><td>' + allocation.assigned.first + '</td><td>' + allocation.assigned.last + '</td><td>' + allocation.assigned.broadcast + '</td></tr>';
     }).join('');
     return '<section class="atom6-completed-plan"><h3>Completed LAN Allocations</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>#</th><th>LAN</th><th>Network</th><th>First Usable</th><th>Last Usable</th><th>Broadcast</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
@@ -6008,7 +6134,7 @@ function atom6BuildCurrentLan(qid, ex) {
     if (!state.orderComplete || state.completedLanCount >= ex.scenario.solution.lanAllocations.length) return '';
     const i = state.completedLanCount;
     const allocation = ex.scenario.solution.lanAllocations[i];
-    const lan = ex.scenario.solution.sortedLans[i];
+    const lan = atom6OrderedLans(ex)[i];
     const inputs = state.lanInputs[i];
     const feedback = state.lanFeedback[i] || {};
     return '<section class="atom6-stage atom6-allocation-stage"><div class="atom6-stage-head"><span class="panel-index">' + String(i + 2).padStart(2, '0') + '</span><div><h3>Allocate LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + '</h3><p>' + lan.hosts + ' hosts</p></div><span class="badge">LAN allocation ' + (i + 1) + ' of ' + ex.scenario.lans.length + '</span></div>' +
@@ -6034,18 +6160,19 @@ function atom6BuildWan(qid, ex) {
     if (state.wanComplete) {
         const rows = wan.assignments.map((assignment, i) => {
             const wanRequirement = ex.scenario.wans[i];
-            const block = assignment.block;
+            const assignedIndex = Number.isInteger(state.wanAssignmentIndices?.[i]) ? state.wanAssignmentIndices[i] : i;
+            const block = wan.assignments[assignedIndex]?.block || assignment.block;
             return '<tr><td>' + atom6Escape(wanRequirement.label) + '</td><td>' + block.network + '/' + block.cidr + '</td><td>' + block.first + '</td><td>' + block.last + '</td><td>' + block.broadcast + '</td></tr>';
         }).join('');
-        return '<section class="atom6-stage atom6-stage-complete"><div class="atom6-stage-head"><span class="panel-index"><i class="fa-solid fa-check"></i></span><div><h3>WAN Allocations Complete</h3><p>All WANs were allocated from one shared subnet.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>WAN</th><th>Network</th><th>First Usable IP</th><th>Last Usable IP</th><th>Broadcast</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+        return '<section class="atom6-stage atom6-stage-complete"><div class="atom6-stage-head"><span class="panel-index"><i class="fa-solid fa-check"></i></span><div><h3>WAN Allocations Complete</h3><p>Each WAN is a separate network allocated from the first remaining subnet that can supply the complete WAN set.</p></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>WAN</th><th>Network</th><th>First Usable IP</th><th>Last Usable IP</th><th>Broadcast</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
     }
     const inputs = state.wanInputs;
     const feedback = state.wanFeedback || {};
     const linkRows = ex.scenario.wans.map((wanRequirement, i) => {
         const linkFeedback = feedback.links?.[i] || {};
-        return '<article class="atom6-link-allocation"><h4>' + atom6Escape(wanRequirement.label) + ' <small>' + wanRequirement.requiredIp + ' IP required</small></h4>' + atom6AllocationTable(qid, 'wan-link', i, inputs.links[i], linkFeedback, wan.assignments[i].block, null, ex.locked) + '</article>';
+        return '<article class="atom6-link-allocation"><h4>' + atom6Escape(wanRequirement.label) + ' <small>' + wanRequirement.requiredIp + ' usable IP' + (wanRequirement.requiredIp === 1 ? '' : 's') + '</small></h4>' + atom6AllocationTable(qid, 'wan-link', i, inputs.links[i], linkFeedback, wan.assignments[i].block, null, ex.locked) + '</article>';
     }).join('');
-    return '<section class="atom6-stage atom6-allocation-stage"><div class="atom6-stage-head"><span class="panel-index">' + String(ex.scenario.lans.length + 2).padStart(2, '0') + '</span><div><h3>Allocate WANs</h3><p>Subnet one shared source and assign one resulting network to each WAN.</p></div><span class="badge">' + ex.scenario.wans.length + ' WAN' + (ex.scenario.wans.length === 1 ? '' : 's') + '</span></div>' +
+    return '<section class="atom6-stage atom6-allocation-stage"><div class="atom6-stage-head"><span class="panel-index">' + String(ex.scenario.lans.length + 2).padStart(2, '0') + '</span><div><h3>Allocate WANs</h3><p>Use the first remaining subnet that can produce all ' + wan.requiredBlockCount + ' required /' + ex.scenario.wans[0].requiredCidr + ' WAN networks.</p></div><span class="badge">' + ex.scenario.wans.length + ' WAN' + (ex.scenario.wans.length === 1 ? '' : 's') + '</span></div>' +
         atom6BlockSummary(wan.source, 'Shared WAN source') +
         '<div class="atom6-parameter-grid"><label><span>WAN CIDR</span><div class="atom6-cidr-input"><span>/</span>' + atom6ScalarInput(qid, 'wan', 0, 'cidr', inputs.cidr, feedback.cidr, ex.locked, 'WAN CIDR', wan.source.cidr, 30) + '</div></label>' +
         '<label><span>Subnet Mask</span>' + atom6IpInput(qid, 'wan', 0, 'mask', inputs.mask, feedback, ex.locked, 'Subnet Mask') + '</label></div>' + linkRows +
@@ -6080,6 +6207,7 @@ function renderAtom6View(atom6List) {
     }
     attachAtomPaginationHandlers();
     initAtomPagination('atom6');
+    atom6ScheduleTopologyConnections();
 }
 
 function atom6Rerender(qid) {
@@ -6088,6 +6216,7 @@ function atom6Rerender(qid) {
     if (!panel || !ex) return;
     const index = atom6QuestionIds.indexOf(qid);
     panel.outerHTML = buildAtom6PanelHtml(qid, ex, index + 1);
+    atom6ScheduleTopologyConnections();
     updateAtom6NavScore();
     updateSummaryPanel();
 }
@@ -6142,6 +6271,7 @@ function atom6CheckOrder(qid) {
         ex.atom6State.orderFeedback = 'Arrange LANs from largest to smallest, followed by every WAN.';
     } else {
         ex.atom6State.orderComplete = true;
+        ex.atom6State.allocationLanIds = ex.atom6State.order.filter(id => ex.scenario.lans.some(lan => lan.id === id));
         ex.atom6State.orderFeedback = '';
         ex.atom6State.message = 'Priority confirmed. The first LAN allocation is now available.';
         ex.score = 1;
@@ -6183,16 +6313,33 @@ function atom6CheckWan(qid) {
     const expectedCidr = Number(QUESTION_CONFIG.atom6.wanRequirement.allocationCidr);
     const feedback = { cidr: Number(input.cidr) === expectedCidr };
     feedback.mask = atom6CheckOctets(input.mask, atom6MaskOctets(expectedCidr)).result;
+    const expectedBlocks = wan.assignments.map(assignment => assignment.block);
+    const acceptEquivalentOrder = QUESTION_CONFIG.atom6.allocation?.acceptEquivalentLinkOrder !== false;
+    const fullMatchIndex = linkInput => expectedBlocks.findIndex(block => ['network', 'first', 'last', 'broadcast'].every(field => atom6CheckOctets(linkInput[field], block[field]).result.every(Boolean)));
+    const assignmentIndices = input.links.map((linkInput, i) => acceptEquivalentOrder ? fullMatchIndex(linkInput) : i);
+    const usedAssignmentIndices = new Set();
+    const duplicateRows = new Set();
+    if (acceptEquivalentOrder) assignmentIndices.forEach((assignmentIndex, rowIndex) => {
+        if (assignmentIndex < 0) return;
+        if (usedAssignmentIndices.has(assignmentIndex)) duplicateRows.add(rowIndex);
+        else usedAssignmentIndices.add(assignmentIndex);
+    });
     feedback.links = input.links.map((linkInput, i) => {
-        const block = wan.assignments[i].block;
+        const enteredNetwork = atom8ParseIp((linkInput.network || []).join('.'))?.text;
+        const networkMatchIndex = expectedBlocks.findIndex(block => block.network === enteredNetwork);
+        const preferredIndex = acceptEquivalentOrder && networkMatchIndex >= 0 && !duplicateRows.has(i) ? networkMatchIndex : i;
+        const block = expectedBlocks[preferredIndex];
         const result = {};
         ['network', 'first', 'last', 'broadcast'].forEach(field => result[field] = atom6CheckOctets(linkInput[field], block[field]).result);
         return result;
     });
     ex.atom6State.wanFeedback = feedback;
-    const linksCorrect = feedback.links.every(link => ['network', 'first', 'last', 'broadcast'].every(field => link[field].every(Boolean)));
+    const linksCorrect = acceptEquivalentOrder ?
+        assignmentIndices.every(index => index >= 0) && new Set(assignmentIndices).size === expectedBlocks.length :
+        feedback.links.every(link => ['network', 'first', 'last', 'broadcast'].every(field => link[field].every(Boolean)));
     const allCorrect = feedback.cidr && feedback.mask.every(Boolean) && linksCorrect;
     if (allCorrect) {
+        ex.atom6State.wanAssignmentIndices = assignmentIndices;
         ex.atom6State.wanComplete = true;
         ex.atom6State.message = 'VLSM plan complete.';
         ex.score = ex.answers.length;
@@ -6253,6 +6400,7 @@ function syncAtom6ViewDOM() {
     if (container) container.innerHTML = atom6QuestionIds.map((qid, i) => buildAtom6PanelHtml(qid, exerciseData[qid], i + 1)).join('');
     const currentPage = ATOM_PAGINATION.atom6 ? ATOM_PAGINATION.atom6.current : 0;
     showAtomQuestion('atom6', currentPage, { scroll: false });
+    atom6ScheduleTopologyConnections();
     updateAtom6NavScore();
     updateSummaryPanel();
 }
@@ -6265,6 +6413,7 @@ function showAtom6Page() {
         if (view) view.style.display = 'none';
     });
     document.getElementById('atom6View').style.display = 'flex';
+    atom6ScheduleTopologyConnections();
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
     showAtomPaginationBar('atom6');
     currentFile = '';
@@ -6302,6 +6451,7 @@ function renderAtom7View(scenario) {
     const enabled = !!(QUESTION_CONFIG.atom7?.enabled && scenario);
     if (nav) nav.style.display = enabled ? '' : 'none';
     if (container) container.innerHTML = enabled ? atom7BuildBrief(scenario) : '';
+    if (enabled) atom6ScheduleTopologyConnections();
     if (!enabled && view) view.style.display = 'none';
 }
 
@@ -6314,6 +6464,7 @@ function showAtom7Page() {
         if (view) view.style.display = 'none';
     });
     document.getElementById('atom7View').style.display = 'flex';
+    atom6ScheduleTopologyConnections();
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
     hideAllAtomPaginationBars();
     currentFile = '';
@@ -6326,6 +6477,8 @@ function showAtom7Page() {
    ATOM 8: IN-APP VLSM DEPLOYMENT
 ========================================================= */
 let atom8HandlersAttached = false;
+let atom8ConnectionResizeBound = false;
+let atom8ConnectionFrame = null;
 
 function atom8BuildModel(scenario, seedStr) {
     const cfg = QUESTION_CONFIG.atom8;
@@ -6334,6 +6487,7 @@ function atom8BuildModel(scenario, seedStr) {
         const lanPorts = router.lanIds.map((lanId, i) => ({
             id: 'lan-port-' + (i + 1), role: 'lan', targetId: lanId,
             name: cfg.lanInterfaceNames[routerIndex]?.[i] || ('GigabitEthernet0/' + i),
+            shortName: cfg.lanInterfaceShortNames[routerIndex]?.[i] || cfg.lanInterfaceNames[routerIndex]?.[i],
             dce: false
         }));
         const wanPorts = router.wanIds.map((wanId, i) => {
@@ -6341,6 +6495,7 @@ function atom8BuildModel(scenario, seedStr) {
             return {
                 id: 'wan-port-' + (i + 1), role: 'wan', targetId: wanId,
                 name: cfg.wanInterfaceNames[routerIndex]?.[i] || ('Serial0/0/' + i),
+                shortName: cfg.wanInterfaceShortNames[routerIndex]?.[i] || cfg.wanInterfaceNames[routerIndex]?.[i],
                 dce: Number(cfg.dceRouterByWan[wan.number - 1]) === router.number
             };
         });
@@ -6360,6 +6515,8 @@ function atom8BuildModel(scenario, seedStr) {
 }
 
 function atom8InitialState(model) {
+    const initialRouteEntries = Math.max(1, Number(QUESTION_CONFIG.atom8.initialRouteEntries) || 1);
+    const maxRouteEntries = Math.max(1, Number(QUESTION_CONFIG.atom8.maxStaticRoutesPerRouter) || 1);
     const routers = {};
     model.routers.forEach(router => {
         routers[router.id] = {
@@ -6367,7 +6524,7 @@ function atom8InitialState(model) {
             ports: Object.fromEntries(router.ports.map(port => [port.id, {
                 ip: '', mask: '', enabled: false, clockRate: port.dce ? '' : null
             }])),
-            routes: Array.from({ length: router.routeCount }, () => ({ destination: '', mask: '', nextHop: '' }))
+            routes: Array.from({ length: Math.min(initialRouteEntries, maxRouteEntries) }, () => ({ destination: '', mask: '', nextHop: '' }))
         };
     });
     const hosts = Object.fromEntries(model.hosts.map(host => [host.id, {
@@ -6396,7 +6553,17 @@ function atom8BuildExerciseData(scenario, model) {
 
 function atom8RestoreState(ex) {
     if (!ex?.userAnswer) return ex?.atom8State || atom8InitialState(ex.model);
-    try { return JSON.parse(ex.userAnswer); }
+    try {
+        const restored = JSON.parse(ex.userAnswer);
+        ex.model.routers.forEach(router => {
+            const routerState = restored.routers?.[router.id];
+            if (!routerState) return;
+            const routes = Array.isArray(routerState.routes) ? routerState.routes : [];
+            const hasRouteInput = routes.some(route => route.destination || route.mask || route.nextHop);
+            if (!hasRouteInput) routerState.routes = [{ destination: '', mask: '', nextHop: '' }];
+        });
+        return restored;
+    }
     catch (err) { console.warn('Could not restore Atom 8 state:', err); }
     return atom8InitialState(ex.model);
 }
@@ -6522,28 +6689,33 @@ function atom8Validate(ex) {
             validation.routers[router.id] = 'gray';
             return;
         }
-        const expected = scenario.lans.filter(lan => lan.routerId !== router.id).map(lan => {
-            const destinationPort = portRecords.find(record => record.port.role === 'lan' && record.port.targetId === lan.id);
-            const hop = atom8FirstHop(scenario, router.id, lan.routerId);
-            const nextPort = hop && portRecords.find(record => record.routerId === hop.routerId && record.port.targetId === hop.wanId);
-            return destinationPort && nextPort ? {
-                destination: destinationPort.block.network,
-                mask: destinationPort.block.mask.join('.'),
-                nextHop: nextPort.block.ip
-            } : null;
-        });
-        const used = new Set();
         const portsValid = router.ports.every(port => validation.ports[router.id + ':' + port.id] === 'green');
-        let routesValid = portsValid && expected.length === routerState.routes.length && expected.every(route => {
-            if (!route) return false;
-            const index = routerState.routes.findIndex((input, i) => !used.has(i) &&
-                atom8ParseIp(input.destination)?.text === route.destination &&
-                atom8ParseIp(input.mask)?.text === route.mask &&
-                atom8ParseIp(input.nextHop)?.text === route.nextHop);
-            if (index < 0) return false;
-            used.add(index);
-            return true;
+        const routeRecords = routerState.routes.map(input => {
+            const destination = atom8ConfiguredBlock(input.destination, input.mask);
+            const destinationInput = atom8ParseIp(input.destination);
+            const nextHop = atom8ParseIp(input.nextHop);
+            const peerWan = nextHop && portRecords.find(record => {
+                if (record.routerId === router.id || record.port.role !== 'wan' || record.block.ip !== nextHop.text) return false;
+                return router.ports.some(port => port.role === 'wan' && port.targetId === record.port.targetId);
+            });
+            const valid = !!(destination && destinationInput && destinationInput.text === destination.network && nextHop && peerWan && validation.ports[peerWan.key] === 'green');
+            return { input, destination, nextHop, peerWan, valid };
         });
+        const routesWellFormed = routeRecords.length > 0 && routeRecords.every(route => route.valid);
+        const remoteNetworksReachable = scenario.lans.filter(lan => lan.routerId !== router.id).every(lan => {
+            const destinationPort = portRecords.find(record => record.port.role === 'lan' && record.port.targetId === lan.id && validation.ports[record.key] === 'green');
+            const hop = atom8FirstHop(scenario, router.id, lan.routerId);
+            if (!destinationPort || !hop) return false;
+            const destinationEnd = destinationPort.block.networkInt + destinationPort.block.availableIp - 1;
+            const candidates = routeRecords.filter(route => route.valid &&
+                route.destination.networkInt <= destinationPort.block.networkInt &&
+                route.destination.networkInt + route.destination.availableIp - 1 >= destinationEnd);
+            if (!candidates.length) return false;
+            const longestPrefix = Math.max(...candidates.map(route => route.destination.cidr));
+            const selectedRoutes = candidates.filter(route => route.destination.cidr === longestPrefix);
+            return selectedRoutes.every(route => route.peerWan.routerId === hop.routerId && route.peerWan.port.targetId === hop.wanId);
+        });
+        const routesValid = portsValid && routesWellFormed && remoteNetworksReachable;
         validation.routes[router.id] = routesValid ? 'green' : 'red';
         validation.routers[router.id] = portsValid && routesValid ? 'green' : 'red';
     });
@@ -6564,52 +6736,55 @@ function atom8StatusDot(status) {
     return '<span class="atom8-status-dot ' + atom6Escape(status || 'gray') + '" aria-label="' + atom6Escape(status || 'not configured') + '"></span>';
 }
 
-function atom8PortOverlay(ex, router, port) {
-    const state = ex.atom8State.routers[router.id].ports[port.id];
-    const status = ex.atom8State.validation.ports[router.id + ':' + port.id] || 'gray';
-    const prefix = atom8MaskPrefix(state.mask);
-    const value = state.ip && prefix !== null ? state.ip + '/' + prefix : 'Not configured';
-    return '<div class="atom8-port-overlay">' + atom8StatusDot(status) + '<span><strong>' + atom6Escape(port.name) + '</strong><small>' + atom6Escape(value) + '</small></span></div>';
-}
-
 function atom8BuildTopology(ex) {
     const scenario = ex.scenario;
     const model = ex.model;
-    const wanLinks = scenario.wans.map(wan => {
-        const endpoints = model.routers.filter(router => router.ports.some(port => port.targetId === wan.id));
-        return '<div class="atom8-wan-link">' + atom8PortOverlay(ex, endpoints[0], endpoints[0].ports.find(port => port.targetId === wan.id)) +
-            '<div class="atom8-serial-line"><span>WAN ' + wan.number + ' · Serial</span></div>' +
-            atom8PortOverlay(ex, endpoints[1], endpoints[1].ports.find(port => port.targetId === wan.id)) + '</div>';
+    const siteWidth = 280;
+    const siteGap = 38;
+    const canvasWidth = model.routers.length * siteWidth + Math.max(0, model.routers.length - 1) * siteGap;
+    const routerCenterX = routerIndex => (siteWidth / 2) + routerIndex * (siteWidth + siteGap);
+    const routerTop = 0;
+    const baseY = 36;
+    const overlayHeight = 110;
+    const wanPaths = scenario.wans.map(wan => {
+        const fromIndex = model.routers.findIndex(router => router.id === wan.fromRouterId);
+        const toIndex = model.routers.findIndex(router => router.id === wan.toRouterId);
+        const x1 = routerCenterX(fromIndex);
+        const x2 = routerCenterX(toIndex);
+        const midpoint = (x1 + x2) / 2;
+        return '<path class="atom6-wan-svg-path" d="M ' + x1 + ' ' + baseY + ' Q ' + midpoint + ' ' + baseY + ' ' + x2 + ' ' + baseY + '"></path>' +
+            '<text class="atom6-wan-svg-label" x="' + midpoint + '" y="' + (baseY - 8) + '" text-anchor="middle">WAN ' + wan.number + ' · Serial</text>';
     }).join('');
     const routerSites = model.routers.map(router => {
         const routerStatus = ex.atom8State.validation.routers[router.id] || 'gray';
         const lans = scenario.lans.filter(lan => lan.routerId === router.id).map(lan => {
-            const port = router.ports.find(item => item.targetId === lan.id);
             const hosts = model.hosts.filter(host => host.lanId === lan.id).map(host => {
                 const input = ex.atom8State.hosts[host.id];
                 const status = ex.atom8State.validation.hosts[host.id] || 'gray';
                 const prefix = atom8MaskPrefix(input.mask);
                 const value = input.ip && prefix !== null ? input.ip + '/' + prefix : 'Not configured';
-                return '<button type="button" class="atom8-device-button atom8-host-button" data-device-kind="host" data-device-id="' + host.id + '">' +
-                    atom8StatusDot(status) + '<i class="fa-solid fa-desktop" aria-hidden="true"></i><strong>' + atom6Escape(host.label) + '</strong><small>' + atom6Escape(value) + '</small></button>';
+                return '<button type="button" class="atom6-device atom6-host-device atom8-device-button atom8-host-button" data-device-kind="host" data-device-id="' + host.id + '" data-lan-id="' + lan.id + '">' +
+                    atom8StatusDot(status) + '<i class="fa-solid fa-desktop" aria-hidden="true"></i><span>' + atom6Escape(host.label) + '</span><small>' + atom6Escape(value) + '</small></button>';
             }).join('');
-            return '<article class="atom8-lan-branch">' + atom8PortOverlay(ex, router, port) +
-                '<div class="atom8-switch"><i class="fa-solid fa-network-wired" aria-hidden="true"></i><strong>LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + '</strong><small>' + lan.hosts + ' hosts required</small></div>' +
-                '<div class="atom8-host-grid">' + hosts + '</div></article>';
+            return '<div class="atom6-lan-branch atom8-lan-branch" aria-label="LAN ' + lan.number + ' topology">' +
+                '<div class="atom6-device atom6-switch-device" data-lan-id="' + lan.id + '"><i class="fa-solid fa-network-wired" aria-hidden="true"></i><span>Switch</span></div>' +
+                '<div class="atom8-host-grid">' + hosts + '</div>' +
+                '<div class="atom6-topology-lan-label"><strong>LAN ' + lan.number + '</strong><span>' + atom6Escape(lan.label) + '</span><small>' + lan.hosts + ' hosts required</small></div></div>';
         }).join('');
-        return '<section class="atom8-router-site"><button type="button" class="atom8-device-button atom8-router-button" data-device-kind="router" data-device-id="' + router.id + '">' +
-            atom8StatusDot(routerStatus) + '<i class="fa-solid fa-router" aria-hidden="true"></i><strong>Router ' + router.number + '</strong><small>Configure interfaces and static routes</small></button>' +
-            '<div class="atom8-router-lans">' + lans + '</div></section>';
+        return '<div class="atom6-topology-site atom8-router-site"><button type="button" class="atom6-device atom6-router-device atom8-device-button atom8-router-button" data-device-kind="router" data-device-id="' + router.id + '" data-router-id="' + router.id + '">' +
+            atom8StatusDot(routerStatus) + '<i class="fa-solid fa-router" aria-hidden="true"></i><span>Router ' + router.number + '</span></button>' +
+            '<div class="atom6-lan-branches atom8-router-lans' + (scenario.lans.filter(lan => lan.routerId === router.id).length > 1 ? ' has-multiple' : '') + '">' + lans + '</div></div>';
     }).join('');
-    return '<section class="atom8-topology"><div class="atom6-topology-heading"><div><span>Interactive Deployment</span><h3>Device Topology</h3></div><small>Select a router or host to configure it. Switches require no configuration.</small></div>' +
-        '<div class="atom8-wan-links">' + wanLinks + '</div><div class="atom8-router-grid">' + routerSites + '</div></section>';
+    return '<section class="atom6-topology atom8-topology" aria-label="Interactive network topology"><div class="atom6-topology-heading"><div><span>Interactive Deployment</span><h3>Network Topology</h3></div><small>Select a router or host to configure it. Switches require no configuration.</small></div>' +
+        '<div class="atom6-topology-scroll"><div class="atom6-topology-canvas atom8-topology-canvas" style="width:' + canvasWidth + 'px"><svg class="atom6-wan-overlay" style="height:' + overlayHeight + 'px" viewBox="0 0 ' + canvasWidth + ' ' + overlayHeight + '" preserveAspectRatio="none" aria-label="Serial WAN connections">' + wanPaths + '</svg>' +
+        '<div class="atom6-topology-router-row atom8-topology-router-row" style="padding-top:' + routerTop + 'px">' + routerSites + '</div></div></div></section>';
 }
 
 function atom8BuildPanel(ex) {
     const scenario = ex.scenario;
     const score = ex.score + '/' + ex.answers.length;
     const lanCards = scenario.lans.map(lan => '<article class="atom6-requirement-card atom6-lan-card"><div class="atom6-requirement-type">LAN ' + lan.number + '</div><div class="atom6-requirement-name">' + atom6Escape(lan.label) + '</div><strong>' + lan.hosts + ' hosts</strong></article>');
-    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Point-to-Point</div><strong>2 IP required</strong></article>');
+    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Point-to-Point</div><strong>' + wan.requiredIp + ' usable IP' + (wan.requiredIp === 1 ? '' : 's') + '</strong></article>');
     return '<section class="panel atom8-panel"><div class="panel-head"><span class="panel-index">A8</span><div><h2>Apply Your VLSM Design</h2><p>Configurations are validated and scored automatically whenever they are applied.</p></div><span class="badge atom1-score-badge" id="atom8ScoreBadge">' + score + '</span></div>' +
         '<div class="atom6-parent-network"><span><small>Primary allocation source</small>Parent Network</span><strong>' + scenario.parent.network + '/' + scenario.parent.cidr + '</strong></div>' +
         atom8BuildTopology(ex) + '<div class="atom6-requirements-heading"><span>Seeded Requirement</span><h3>LAN and WAN Requirements</h3></div><div class="atom6-requirement-grid">' + lanCards.concat(wanCards).join('') + '</div></section>';
@@ -6626,12 +6801,124 @@ function renderAtom8View() {
     ex.atom8State = ex.atom8State || atom8RestoreState(ex);
     atom8Validate(ex);
     container.innerHTML = atom8BuildPanel(ex);
+    atom8ScheduleTopologyConnections();
     updateAtom8NavScore();
     if (!atom8HandlersAttached) {
         atom8HandlersAttached = true;
         container.addEventListener('click', atom8HandleDeviceClick);
         document.addEventListener('click', atom8HandleModalClick);
     }
+    if (!atom8ConnectionResizeBound) {
+        atom8ConnectionResizeBound = true;
+        window.addEventListener('resize', atom8ScheduleTopologyConnections);
+    }
+}
+
+function atom8ScheduleTopologyConnections() {
+    if (atom8ConnectionFrame !== null) cancelAnimationFrame(atom8ConnectionFrame);
+    atom8ConnectionFrame = requestAnimationFrame(() => {
+        atom8ConnectionFrame = requestAnimationFrame(() => {
+            atom8ConnectionFrame = null;
+            atom8DrawTopologyConnections();
+        });
+    });
+}
+
+function atom8DrawTopologyConnections() {
+    const ex = exerciseData['atom8-main'];
+    const canvas = document.querySelector('#atom8Container .atom8-topology-canvas');
+    if (!ex || !canvas || canvas.offsetWidth === 0) return;
+    canvas.querySelector('.atom8-physical-links')?.remove();
+    const canvasRect = canvas.getBoundingClientRect();
+    const width = canvas.offsetWidth;
+    const height = Math.max(canvas.scrollHeight, canvas.offsetHeight);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'atom8-physical-links');
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('aria-hidden', 'true');
+    const point = (element, edge, offsetX = 0) => {
+        const rect = element.getBoundingClientRect();
+        return {
+            x: rect.left - canvasRect.left + rect.width / 2 + offsetX,
+            y: (edge === 'top' ? rect.top : rect.bottom) - canvasRect.top
+        };
+    };
+    const addPath = (start, end, className) => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const vertical = Math.max(24, (end.y - start.y) * 0.44);
+        path.setAttribute('class', 'atom8-physical-link ' + className);
+        path.setAttribute('d', 'M ' + start.x + ' ' + start.y + ' C ' + start.x + ' ' + (start.y + vertical) + ', ' + end.x + ' ' + (end.y - vertical) + ', ' + end.x + ' ' + end.y);
+        svg.appendChild(path);
+        return {
+            pointAt(t) {
+                const inverse = 1 - t;
+                return {
+                    x: inverse ** 3 * start.x + 3 * inverse ** 2 * t * start.x + 3 * inverse * t ** 2 * end.x + t ** 3 * end.x,
+                    y: inverse ** 3 * start.y + 3 * inverse ** 2 * t * (start.y + vertical) + 3 * inverse * t ** 2 * (end.y - vertical) + t ** 3 * end.y
+                };
+            }
+        };
+    };
+    const addPortLabel = (position, router, port, side, placement = 'above') => {
+        if (!port) return;
+        const status = ex.atom8State.validation.ports[router.id + ':' + port.id] || 'gray';
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('class', 'atom8-link-port-label');
+        group.setAttribute('aria-label', port.name + ': ' + status);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('class', 'atom8-link-port-dot ' + status);
+        dot.setAttribute('cx', position.x);
+        dot.setAttribute('cy', position.y);
+        dot.setAttribute('r', '4');
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const placeLeft = side === 'left';
+        label.setAttribute('x', position.x + (placeLeft ? -7 : 7));
+        label.setAttribute('y', position.y + (placement === 'below' ? 14 : -5));
+        label.setAttribute('text-anchor', placeLeft ? 'end' : 'start');
+        label.textContent = port.shortName || port.name;
+        group.append(dot, label);
+        svg.appendChild(group);
+    };
+    ex.scenario.lans.forEach(lan => {
+        const routerModel = ex.model.routers.find(item => item.id === lan.routerId);
+        const lanPort = routerModel?.ports.find(port => port.role === 'lan' && port.targetId === lan.id);
+        const router = canvas.querySelector('[data-router-id="' + lan.routerId + '"]');
+        const networkSwitch = canvas.querySelector('.atom6-switch-device[data-lan-id="' + lan.id + '"]');
+        if (!router || !networkSwitch) return;
+        const siblingLans = ex.scenario.lans.filter(item => item.routerId === lan.routerId);
+        const lanIndex = siblingLans.findIndex(item => item.id === lan.id);
+        const routerOffset = (lanIndex - (siblingLans.length - 1) / 2) * 22;
+        const start = point(router, 'bottom', routerOffset);
+        const end = point(networkSwitch, 'top');
+        const connection = addPath(start, end, 'router-to-switch');
+        addPortLabel(connection.pointAt(0.36), routerModel, lanPort, end.x < start.x ? 'left' : 'right');
+        const hosts = [...canvas.querySelectorAll('.atom8-host-button[data-lan-id="' + lan.id + '"]')];
+        hosts.forEach((host, hostIndex) => {
+            const switchOffset = (hostIndex - (hosts.length - 1) / 2) * 13;
+            addPath(point(networkSwitch, 'bottom', switchOffset), point(host, 'top'), 'switch-to-host');
+        });
+    });
+    ex.scenario.wans.forEach(wan => {
+        const fromRouter = ex.model.routers.find(router => router.id === wan.fromRouterId);
+        const toRouter = ex.model.routers.find(router => router.id === wan.toRouterId);
+        const fromElement = canvas.querySelector('[data-router-id="' + wan.fromRouterId + '"]');
+        const toElement = canvas.querySelector('[data-router-id="' + wan.toRouterId + '"]');
+        if (!fromRouter || !toRouter || !fromElement || !toElement) return;
+        const fromRect = fromElement.getBoundingClientRect();
+        const toRect = toElement.getBoundingClientRect();
+        const leftToRight = fromRect.left < toRect.left;
+        const fromPosition = {
+            x: (leftToRight ? fromRect.right : fromRect.left) - canvasRect.left + (leftToRight ? 13 : -13),
+            y: fromRect.top - canvasRect.top + fromRect.height / 2
+        };
+        const toPosition = {
+            x: (leftToRight ? toRect.left : toRect.right) - canvasRect.left + (leftToRight ? -13 : 13),
+            y: toRect.top - canvasRect.top + toRect.height / 2
+        };
+        addPortLabel(fromPosition, fromRouter, fromRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'right' : 'left', 'below');
+        addPortLabel(toPosition, toRouter, toRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'left' : 'right', 'below');
+    });
+    canvas.prepend(svg);
 }
 
 function syncAtom8ViewDOM() {
@@ -6651,6 +6938,30 @@ function updateAtom8NavScore() {
 
 function atom8Input(label, kind, id, field, value, disabled) {
     return '<label><span>' + atom6Escape(label) + '</span><input type="text" data-config-kind="' + kind + '" data-config-id="' + id + '" data-field="' + field + '" value="' + atom6Escape(value || '') + '"' + (disabled ? ' disabled' : '') + '></label>';
+}
+
+function atom8HostIpRow(label, hostId, field, value, disabled) {
+    return '<label class="atom8-windows-ip-row"><span>' + atom6Escape(label) + '</span><input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0.0.0.0" data-config-kind="host" data-config-id="' + hostId + '" data-field="' + field + '" value="' + atom6Escape(value || '') + '"' + (disabled ? ' disabled' : '') + '></label>';
+}
+
+function atom8RouteEntry(route, index, disabled) {
+    return '<fieldset class="atom8-config-group atom8-route-entry" data-route-index="' + index + '"><legend><span>Static Route ' + (index + 1) + '</span>' +
+        (index > 0 && !disabled ? '<button type="button" class="atom8-remove-route" aria-label="Remove static route ' + (index + 1) + '"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>Remove</span></button>' : '') +
+        '</legend><div class="atom8-form-grid">' + atom8Input('Destination Network', 'route', index, 'destination', route.destination, disabled) +
+        atom8Input('Subnet Mask', 'route', index, 'mask', route.mask, disabled) + atom8Input('Next-Hop Address', 'route', index, 'nextHop', route.nextHop, disabled) + '</div></fieldset>';
+}
+
+function atom8ReindexRouteEntries(modal) {
+    const entries = [...modal.querySelectorAll('.atom8-route-entry')];
+    entries.forEach((entry, index) => {
+        entry.dataset.routeIndex = index;
+        entry.querySelector('legend > span').textContent = 'Static Route ' + (index + 1);
+        entry.querySelectorAll('[data-config-kind="route"]').forEach(input => { input.dataset.configId = index; });
+        const remove = entry.querySelector('.atom8-remove-route');
+        if (remove) remove.setAttribute('aria-label', 'Remove static route ' + (index + 1));
+    });
+    const add = modal.querySelector('.atom8-add-route');
+    if (add) add.disabled = entries.length >= Number(add.dataset.maxRoutes);
 }
 
 function atom8OpenRouterModal(routerId) {
@@ -6674,11 +6985,12 @@ function atom8OpenRouterModal(routerId) {
             '<label class="atom8-checkbox"><input type="checkbox" data-config-kind="port" data-config-id="' + port.id + '" data-field="enabled"' + (input.enabled ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>Port enabled</span></label></div></fieldset>' +
             (port.dce ? '<div class="atom8-interface-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>This is the configured DCE endpoint. Its clock rate must match the activity setting.</span></div>' : '') + '</section>';
     }).join('');
-    const routes = state.routes.map((route, i) => '<fieldset class="atom8-config-group"><legend>Static Route ' + (i + 1) + '</legend><div class="atom8-form-grid">' +
-        atom8Input('Destination Network', 'route', i, 'destination', route.destination, disabled) + atom8Input('Subnet Mask', 'route', i, 'mask', route.mask, disabled) + atom8Input('Next-Hop Address', 'route', i, 'nextHop', route.nextHop, disabled) + '</div></fieldset>').join('');
+    const routes = state.routes.map((route, i) => atom8RouteEntry(route, i, disabled)).join('');
     const routeStatus = ex.atom8State.validation.routes[routerId] || 'gray';
-    const routeNav = '<button type="button" role="tab" class="atom8-config-nav-btn atom8-route-nav" data-config-panel="static-routes" aria-selected="false">' + atom8StatusDot(routeStatus) + '<span><strong>Static Routing</strong><small>' + router.routeCount + ' remote LAN route' + (router.routeCount === 1 ? '' : 's') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
-    const routePanel = '<section role="tabpanel" class="atom8-config-panel" data-config-panel-content="static-routes" hidden><div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div><div><span>ROUTING SETTINGS</span><h3>Static Routes</h3><p>Enter one route for every remote LAN using its destination network, mask, and next hop.</p></div>' + atom8StatusDot(routeStatus) + '</div>' + routes + '</section>';
+    const maxStaticRoutes = Math.max(1, Number(QUESTION_CONFIG.atom8.maxStaticRoutesPerRouter) || 1);
+    const routeNav = '<button type="button" role="tab" class="atom8-config-nav-btn atom8-route-nav" data-config-panel="static-routes" aria-selected="false">' + atom8StatusDot(routeStatus) + '<span><strong>Static Routing</strong><small>' + state.routes.length + ' configured · ' + router.routeCount + ' remote LAN' + (router.routeCount === 1 ? '' : 's') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
+    const routePanel = '<section role="tabpanel" class="atom8-config-panel" data-config-panel-content="static-routes" hidden><div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div><div><span>ROUTING SETTINGS</span><h3>Static Routes</h3><p>Add routes as needed. Inter-network reachability is checked using destination, mask, next hop, and longest-prefix matching.</p></div>' + atom8StatusDot(routeStatus) + '</div><div class="atom8-route-list">' + routes + '</div>' +
+        (!disabled ? '<div class="atom8-route-actions"><button type="button" class="secondary-btn atom8-add-route" data-max-routes="' + maxStaticRoutes + '"' + (state.routes.length >= maxStaticRoutes ? ' disabled' : '') + '><i class="fa-solid fa-plus" aria-hidden="true"></i> Add Route</button><small>Up to ' + maxStaticRoutes + ' static routes</small></div>' : '') + '</section>';
     const body = '<div class="atom8-router-config-shell"><aside class="atom8-config-side-nav"><div class="atom8-device-summary"><i class="fa-solid fa-router" aria-hidden="true"></i><span><strong>Router ' + router.number + '</strong><small>Configuration</small></span></div><div class="atom8-config-nav-label">Interfaces</div><div class="atom8-config-nav-list" role="tablist" aria-label="Router settings">' + portNav + '</div><div class="atom8-config-nav-label">Routing</div><div class="atom8-config-nav-list" role="tablist">' + routeNav + '</div></aside><div class="atom8-config-workspace">' + portPanels + routePanel + '</div></div>';
     atom8ShowModal('Router ' + router.number + ' Configuration', body, 'router', routerId, disabled);
 }
@@ -6689,20 +7001,24 @@ function atom8OpenHostModal(hostId) {
     const state = ex.atom8State.hosts[hostId];
     const lan = ex.scenario.lans.find(item => item.id === host.lanId);
     const disabled = !!state.locked;
-    const body = '<p class="atom8-modal-context">LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + ' · ' + lan.hosts + ' hosts required</p><div class="atom8-form-grid">' +
-        atom8Input('IPv4 Address', 'host', hostId, 'ip', state.ip, disabled) + atom8Input('Subnet Mask', 'host', hostId, 'mask', state.mask, disabled) + atom8Input('Default Gateway', 'host', hostId, 'gateway', state.gateway, disabled) + '</div>';
-    atom8ShowModal(host.label + ' Configuration', body, 'host', hostId, disabled);
+    const body = '<div class="atom8-windows-host-shell"><div class="atom8-windows-device-banner"><div class="atom8-windows-device-icon"><i class="fa-solid fa-desktop" aria-hidden="true"></i></div><div><span>NETWORK ADAPTER</span><h3>' + atom6Escape(host.label) + '</h3><p>LAN ' + lan.number + ' · ' + atom6Escape(lan.label) + ' · ' + lan.hosts + ' hosts required</p></div></div>' +
+        '<section class="atom8-windows-ipv4-card" aria-labelledby="atom8WindowsIpv4Title"><div class="atom8-windows-ipv4-heading"><i class="fa-solid fa-globe" aria-hidden="true"></i><div><h3 id="atom8WindowsIpv4Title">Internet Protocol Version 4 (TCP/IPv4)</h3><p>Configure the static IPv4 settings assigned in your VLSM plan.</p></div></div>' +
+        '<div class="atom8-windows-radio" role="radio" aria-checked="false" aria-disabled="true"><span aria-hidden="true"></span>Obtain an IP address automatically</div>' +
+        '<div class="atom8-windows-radio selected" role="radio" aria-checked="true"><span aria-hidden="true"></span>Use the following IP address:</div>' +
+        '<div class="atom8-windows-ip-fields">' + atom8HostIpRow('IP address:', hostId, 'ip', state.ip, disabled) + atom8HostIpRow('Subnet mask:', hostId, 'mask', state.mask, disabled) + atom8HostIpRow('Default gateway:', hostId, 'gateway', state.gateway, disabled) + '</div></section></div>';
+    atom8ShowModal(host.label + ' · IPv4 Properties', body, 'host', hostId, disabled);
 }
 
 function atom8ShowModal(title, body, kind, id, disabled) {
     const modal = document.getElementById('atom8ConfigModal');
     modal.dataset.kind = kind;
     modal.dataset.id = id;
+    modal.classList.toggle('atom8-host-config-modal', kind === 'host');
     document.getElementById('atom8ModalTitle').textContent = title;
     document.getElementById('atom8ModalBody').innerHTML = body;
     const apply = document.getElementById('atom8ApplyConfig');
     apply.disabled = disabled;
-    apply.textContent = disabled ? 'Configuration Locked' : 'Apply Configuration';
+    apply.textContent = disabled ? 'Configuration Locked' : (kind === 'host' ? 'Apply IPv4 Settings' : 'Apply Configuration');
     modal.style.display = 'block';
     document.getElementById('atom8ModalOverlay').style.display = 'block';
 }
@@ -6721,6 +7037,24 @@ function atom8HandleDeviceClick(event) {
 
 function atom8HandleModalClick(event) {
     if (event.target.closest('.atom8-modal-close')) { closeAtom8Modal(); return; }
+    const addRoute = event.target.closest('.atom8-add-route');
+    if (addRoute) {
+        const modal = document.getElementById('atom8ConfigModal');
+        const list = modal.querySelector('.atom8-route-list');
+        const count = list.querySelectorAll('.atom8-route-entry').length;
+        if (count < Number(addRoute.dataset.maxRoutes)) {
+            list.insertAdjacentHTML('beforeend', atom8RouteEntry({ destination: '', mask: '', nextHop: '' }, count, false));
+            atom8ReindexRouteEntries(modal);
+        }
+        return;
+    }
+    const removeRoute = event.target.closest('.atom8-remove-route');
+    if (removeRoute) {
+        const modal = document.getElementById('atom8ConfigModal');
+        removeRoute.closest('.atom8-route-entry')?.remove();
+        atom8ReindexRouteEntries(modal);
+        return;
+    }
     const panelButton = event.target.closest('.atom8-config-nav-btn');
     if (panelButton) {
         const modal = document.getElementById('atom8ConfigModal');
@@ -6746,9 +7080,11 @@ function atom8HandleModalClick(event) {
         document.querySelectorAll('#atom8ModalBody [data-config-kind="port"]').forEach(input => {
             target.ports[input.dataset.configId][input.dataset.field] = input.type === 'checkbox' ? input.checked : input.value.trim();
         });
-        document.querySelectorAll('#atom8ModalBody [data-config-kind="route"]').forEach(input => {
-            target.routes[Number(input.dataset.configId)][input.dataset.field] = input.value.trim();
-        });
+        target.routes = [...document.querySelectorAll('#atom8ModalBody .atom8-route-entry')].map(entry => ({
+            destination: entry.querySelector('[data-field="destination"]').value.trim(),
+            mask: entry.querySelector('[data-field="mask"]').value.trim(),
+            nextHop: entry.querySelector('[data-field="nextHop"]').value.trim()
+        }));
         target.applied = true;
         if (!isRetryAllowed()) target.locked = true;
     } else {
@@ -6773,6 +7109,7 @@ function showAtom8Page() {
         if (view) view.style.display = 'none';
     });
     document.getElementById('atom8View').style.display = 'flex';
+    atom8ScheduleTopologyConnections();
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
     hideAllAtomPaginationBars();
     currentFile = '';

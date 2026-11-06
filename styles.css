@@ -1204,38 +1204,6 @@ body, html {
     background: rgba(30, 41, 59, 0.55);
 }
 
-.atom8-port-overlay {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    padding: 8px 10px;
-    border: 1px solid rgba(129, 140, 248, 0.3);
-    border-radius: 8px;
-    background: rgba(15, 23, 42, 0.86);
-}
-
-.atom8-port-overlay > span:last-child {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-}
-
-.atom8-port-overlay strong {
-    color: #c7d2fe;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-}
-
-.atom8-port-overlay small {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.64rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .atom8-status-dot {
     width: 10px;
     height: 10px;
@@ -1317,6 +1285,178 @@ body, html {
     max-height: calc(84vh - 150px);
     overflow-y: auto;
     padding: 18px 22px;
+}
+
+.modal.atom8-config-modal.atom8-host-config-modal {
+    width: min(640px, calc(100vw - 32px));
+    max-height: min(86vh, 700px);
+}
+
+.atom8-host-config-modal .atom8-modal-body {
+    max-height: calc(86vh - 150px);
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.atom8-windows-host-shell {
+    display: grid;
+    gap: 16px;
+}
+
+.atom8-windows-device-banner {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 13px 15px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.07);
+}
+
+.atom8-windows-device-icon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(16, 185, 129, 0.14);
+    color: var(--host);
+    font-size: 1.25rem;
+}
+
+.atom8-windows-device-banner span {
+    color: var(--host);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+}
+
+.atom8-windows-device-banner h3,
+.atom8-windows-device-banner p {
+    margin: 0;
+}
+
+.atom8-windows-device-banner h3 {
+    margin-top: 2px;
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+.atom8-windows-device-banner p {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.atom8-windows-ipv4-card {
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(30, 41, 59, 0.74);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.atom8-windows-ipv4-heading {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 19px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.atom8-windows-ipv4-heading > i {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.13);
+    color: #93c5fd;
+}
+
+.atom8-windows-ipv4-heading h3,
+.atom8-windows-ipv4-heading p {
+    margin: 0;
+}
+
+.atom8-windows-ipv4-heading h3 {
+    color: var(--text-main);
+    font-size: 0.9rem;
+}
+
+.atom8-windows-ipv4-heading p {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.atom8-windows-radio {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 10px 0;
+    color: var(--text-tertiary);
+    font-size: 0.78rem;
+}
+
+.atom8-windows-radio > span {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 15px;
+    border: 1px solid var(--text-tertiary);
+    border-radius: 50%;
+}
+
+.atom8-windows-radio.selected {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.atom8-windows-radio.selected > span {
+    border: 4px solid var(--locked);
+    background: var(--surface);
+}
+
+.atom8-windows-ip-fields {
+    display: grid;
+    gap: 10px;
+    margin: 13px 0 0 24px;
+    padding-left: 14px;
+    border-left: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.atom8-windows-ip-row {
+    display: grid;
+    grid-template-columns: 142px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+}
+
+.atom8-windows-ip-row input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+}
+
+.atom8-windows-ip-row input:focus {
+    border-color: var(--locked);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.13);
+    outline: none;
+}
+
+.atom8-windows-ip-row input:disabled {
+    opacity: 0.72;
 }
 
 .atom8-router-config-shell {
@@ -1527,6 +1667,50 @@ body, html {
     font-weight: 700;
 }
 
+.atom8-route-entry legend {
+    width: calc(100% - 14px);
+    justify-content: space-between;
+}
+
+.atom8-remove-route {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.68rem;
+}
+
+.atom8-remove-route:hover,
+.atom8-remove-route:focus-visible {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    outline: none;
+}
+
+.atom8-route-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 2px;
+}
+
+.atom8-route-actions .atom8-add-route {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.atom8-route-actions small {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+}
+
 .atom8-form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1582,7 +1766,18 @@ body, html {
 
 @media (max-width: 700px) {
     .modal.atom8-config-modal {
-        width: calc(100vw - 24px);
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+        border-radius: 10px;
+    }
+    .atom8-config-modal .modal-header {
+        padding: 1rem 1.15rem;
+    }
+    .atom8-config-modal .modal-footer {
+        padding: 0.9rem 1rem;
+    }
+    .atom8-modal-body {
+        max-height: calc(100vh - 132px);
     }
     .atom8-wan-link {
         grid-template-columns: 1fr;
@@ -1599,26 +1794,87 @@ body, html {
         margin-left: 24px;
     }
     .atom8-router-config-shell {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(145px, 165px) minmax(0, 1fr);
         margin: -18px -22px;
+    }
+    .atom8-config-side-nav {
+        padding: 14px 8px;
+        border-right: 1px solid var(--border-color);
+        border-bottom: 0;
+    }
+    .atom8-device-summary {
+        margin-inline: 2px;
+        margin-bottom: 12px;
+        padding: 9px;
+    }
+    .atom8-config-nav-list {
+        display: grid;
+        overflow: visible;
+        padding: 0;
+    }
+    .atom8-config-nav-btn {
+        min-width: 0;
+        gap: 6px;
+        padding: 9px 7px;
+    }
+    .atom8-config-nav-btn strong {
+        font-size: 0.59rem;
+    }
+    .atom8-config-nav-btn small {
+        font-size: 0.56rem;
+    }
+    .atom8-config-workspace {
+        padding: 16px 14px;
+    }
+    .atom8-config-panel-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 9px;
+    }
+    .atom8-config-panel-icon {
+        display: none;
+    }
+    .atom8-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .atom8-router-config-shell {
+        grid-template-columns: 1fr;
     }
     .atom8-config-side-nav {
         border-right: 0;
         border-bottom: 1px solid var(--border-color);
     }
     .atom8-device-summary {
-        margin-bottom: 12px;
+        display: none;
+    }
+    .atom8-config-nav-label {
+        margin-top: 8px;
     }
     .atom8-config-nav-list {
-        display: flex;
-        overflow-x: auto;
-        padding-bottom: 3px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .atom8-config-nav-btn {
-        min-width: 180px;
+    .atom8-route-nav {
+        grid-column: 1 / -1;
+    }
+    .atom8-config-nav-btn > i {
+        display: none;
     }
     .atom8-config-workspace {
-        padding: 18px;
+        padding: 15px 12px;
+    }
+    .atom8-windows-ipv4-card {
+        padding: 14px;
+    }
+    .atom8-windows-ip-fields {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+    .atom8-windows-ip-row {
+        grid-template-columns: 1fr;
+        gap: 5px;
     }
 }
 
@@ -1961,6 +2217,218 @@ body, html {
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: 0.64rem;
+}
+
+/* Read-only Atom 6/7 maps share Atom 8's device and physical-link language. */
+.atom6-readonly-topology .atom6-topology-canvas {
+    min-height: 390px;
+}
+
+.atom6-readonly-site {
+    width: 280px;
+    flex-basis: 280px;
+}
+
+.atom6-readonly-lan-branches {
+    gap: 12px;
+    padding-top: 70px;
+}
+
+.atom6-readonly-lan-branches.has-multiple::before {
+    display: none;
+}
+
+.atom6-readonly-lan-branch {
+    width: 134px;
+}
+
+.atom6-readonly-lan-branch .atom6-host-device {
+    margin-top: 28px;
+}
+
+.topology-physical-links {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.topology-physical-link {
+    fill: none;
+    stroke: rgba(56, 189, 248, 0.78);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.topology-physical-link.switch-to-host {
+    stroke: rgba(16, 185, 129, 0.72);
+    stroke-width: 2;
+}
+
+/* Atom 8 uses Atom 7's topology language and adds configuration affordances. */
+.atom8-topology {
+    overflow: visible;
+}
+
+.atom8-topology .atom6-topology-scroll {
+    padding-top: 8px;
+}
+
+.atom8-topology-canvas {
+    min-height: 430px;
+}
+
+.atom8-physical-links {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.atom8-physical-link {
+    fill: none;
+    stroke: rgba(56, 189, 248, 0.78);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.atom8-physical-link.switch-to-host {
+    stroke: rgba(16, 185, 129, 0.72);
+    stroke-width: 2;
+}
+
+.atom8-link-port-label text {
+    fill: #c7d2fe;
+    paint-order: stroke;
+    stroke: var(--background);
+    stroke-width: 2px;
+    stroke-linejoin: round;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.atom8-link-port-dot {
+    fill: var(--text-tertiary);
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1;
+}
+
+.atom8-link-port-dot.green {
+    fill: var(--host);
+}
+
+.atom8-link-port-dot.red {
+    fill: var(--network-id);
+}
+
+.atom8-topology-router-row {
+    gap: 38px;
+}
+
+.atom8-router-site {
+    width: 280px;
+    flex-basis: 280px;
+    gap: 0;
+}
+
+.atom8-device-button {
+    appearance: none;
+    font: inherit;
+}
+
+.atom8-router-button {
+    display: flex;
+    width: 116px;
+    min-height: 72px;
+    grid-template-columns: none;
+    gap: 6px;
+    padding: 8px;
+    text-align: center;
+}
+
+.atom8-router-button > i {
+    grid-row: auto;
+}
+
+.atom8-router-button > span:not(.atom8-status-dot) {
+    color: #93c5fd;
+}
+
+.atom8-device-button:hover,
+.atom8-device-button:focus-visible {
+    border-color: var(--task-accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16), 0 7px 18px rgba(2, 6, 23, 0.3);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.atom8-router-lans {
+    display: flex;
+    gap: 12px;
+    padding-top: 70px;
+}
+
+.atom8-lan-branch {
+    width: 134px;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.atom8-router-lans.has-multiple::before {
+    display: none;
+}
+
+.atom8-host-grid {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 28px;
+}
+
+.atom8-host-button {
+    width: 40px;
+    min-height: 54px;
+    flex: 0 0 40px;
+    gap: 3px;
+    padding: 6px 2px;
+    text-align: center;
+}
+
+.atom8-host-button > i {
+    font-size: 1rem;
+}
+
+.atom8-host-button > span:not(.atom8-status-dot) {
+    max-width: 36px;
+    overflow: hidden;
+    color: var(--host);
+    font-size: 0.54rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.atom8-host-button small {
+    display: none;
+}
+
+.atom8-router-button > .atom8-status-dot,
+.atom8-host-button > .atom8-status-dot {
+    top: 5px;
+    right: 5px;
 }
 
 .atom6-requirements-heading {
