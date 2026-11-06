@@ -326,7 +326,7 @@ const QUESTION_CONFIG = {
         answerKey: {
             // Temporary instructor/demo utility. Set to false to remove the
             // button without changing the Atom 8 renderer or validation.
-            showPopulateButton: true
+            showPopulateButton: false
         },
         connectivityTest: {
             enabled: true,
