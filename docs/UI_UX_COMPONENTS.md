@@ -10,7 +10,7 @@ The application has three top-level states:
 
 Within the shell, content switches among the ungraded Subnet Visualizer, Atoms 1–8, and optional generic conversion exercises. Atom 7 is a read-only, ungraded performance-task brief; Atom 8 applies the same scenario through interactive device modals and automatic scoring. Practice and exam share most components, with mode controlling retry availability only.
 
-Atom 8 router configuration uses a Packet Tracer-style workspace: a persistent side navigation lists each LAN/WAN interface and its validation dot, selecting an interface opens its dedicated IPv4 settings panel, and Static Routing has a separate navigation destination. Switches remain non-configurable.
+Atom 8 router configuration uses a Packet Tracer-style workspace: a persistent side navigation lists each LAN/WAN interface and its validation dot, selecting an interface opens its dedicated IPv4 settings panel, and Static Routing has a separate navigation destination. Switches remain non-configurable. Its topology also has an explicit Visual ICMP Test mode: host clicks select source then destination, an animated packet follows the configured path in both directions, an accessible live region reports success or the stopping router, and a labelled range control adjusts animation speed.
 
 ## 2. Design tokens
 
@@ -194,6 +194,9 @@ Used for network, first host, last host, and broadcast. It combines an address-r
 | Atom 3 | Set boundary, mask, and first/last subnet patterns | Per answerable item |
 | Atom 4 | Compose subnet IDs plus network/broadcast host bits | Per answerable item |
 | Atom 5 | Type one scenario answer; optional method hint | Whole card |
+| Atom 6 | Order requirements, then enter sequential VLSM allocations | Per allocation and field |
+| Atom 7 | Read-only external planning and Packet Tracer brief | Ungraded |
+| Atom 8 | Configure devices, then select two PCs for a visual ICMP test | Per port/host/route plus end-to-end path |
 
 ## 6. Responsive behavior
 
