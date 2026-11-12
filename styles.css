@@ -58,11 +58,89 @@
     --mask-inner-gap: clamp(1px, 0.3vw, 3px);
     --mask-octet-gap: clamp(8px, 1.3vw, 20px);
 }
+/* Atom 8 workspace specificity overrides for the legacy shared test components. */
+.atom8-mode-workspace .atom8-test-rail {
+  display: flex;
+  min-width: 0;
+  max-height: 660px;
+  flex-direction: column;
+  padding: 14px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.atom8-mode-workspace .atom8-official-head {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.atom8-mode-workspace .atom8-official-case-list {
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.atom8-mode-workspace .atom8-official-case {
+  grid-template-columns: 24px 8px minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 9px;
+}
+
+.atom8-mode-workspace .atom8-official-case-index {
+  width: 24px;
+  height: 24px;
+}
+
+.atom8-mode-workspace .atom8-official-case-copy p {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.atom8-mode-workspace .atom8-official-case-copy p i {
+  display: none;
+}
+
+.atom8-mode-workspace .atom8-connectivity-controls {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.atom8-mode-workspace .atom8-endpoint-flow {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 820px) {
+  .atom8-mode-workspace .atom8-test-rail {
+    max-height: none;
+  }
+
+  .atom8-mode-workspace .atom8-official-case-list {
+    max-height: 460px;
+  }
+}
+
+@media (max-width: 560px) {
+  .atom8-mode-workspace .atom8-official-case {
+    grid-template-columns: 24px 8px minmax(0, 1fr);
+  }
+
+  .atom8-mode-workspace .atom8-run-official-case {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
 
 body, html {
     margin: 0;
     padding: 0;
     height: 100%;
+    overflow: hidden;
     font-family: 'Roboto', sans-serif;
     background-color: var(--bg);
     color: var(--text-main);
@@ -250,12 +328,14 @@ body, html {
 .main-layout {
     display: flex;
     height: 100vh;
+    box-sizing: border-box;
     animation: fadeIn 0.3s ease-in-out;
 }
 
 /* Sidebar */
 .sidebar {
     width: 280px;
+    box-sizing: border-box;
     background: var(--surface);
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -977,6 +1057,478 @@ body, html {
     }
 }
 
+/* Atom 8 workflow workspace — topology remains the shared visual context. */
+.atom8-context-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.36);
+  border-radius: 12px;
+  background: linear-gradient(110deg, rgba(30, 64, 175, 0.18), rgba(15, 23, 42, 0.88));
+}
+
+.atom8-parent-context,
+.atom8-score-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.atom8-parent-context span,
+.atom8-score-context {
+  color: #bfdbfe;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.atom8-parent-context small,
+.atom8-score-context small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-tertiary);
+  font-size: .56rem;
+  letter-spacing: .08em;
+}
+
+.atom8-parent-context strong {
+  color: #60a5fa;
+  font-family: var(--font-mono);
+  font-size: 1.12rem;
+  white-space: nowrap;
+}
+
+.atom8-score-context {
+  display: grid;
+  min-width: 108px;
+  place-content: center;
+  gap: 1px;
+  text-align: center;
+}
+
+.atom8-score-context strong {
+  color: #fbbf24;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.atom8-requirements-open,
+.atom8-mode-tab,
+.atom8-self-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, .72);
+  color: var(--text-secondary);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.atom8-requirements-open {
+  min-height: 48px;
+  padding: 0 14px;
+  color: #dbeafe;
+  font-size: .72rem;
+}
+
+.atom8-requirements-open:hover,
+.atom8-requirements-open:focus-visible,
+.atom8-mode-tab:hover:not(:disabled),
+.atom8-mode-tab:focus-visible {
+  border-color: #60a5fa;
+  color: #fff;
+  outline: none;
+}
+
+.atom8-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+  background: rgba(15, 23, 42, .55);
+}
+
+.atom8-mode-tab {
+  min-height: 40px;
+  padding: 0 17px;
+  border-color: transparent;
+  background: transparent;
+  font-size: .74rem;
+}
+
+.atom8-mode-tab.active {
+  border-color: rgba(59, 130, 246, .48);
+  background: rgba(37, 99, 235, .18);
+  color: #bfdbfe;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .08);
+}
+
+.atom8-mode-tab:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.atom8-mode-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  align-items: stretch;
+  gap: 14px;
+  min-width: 0;
+}
+
+.atom8-mode-workspace.configure {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.atom8-topology-stage {
+  min-width: 0;
+}
+
+.atom8-topology-stage > .atom8-topology {
+  height: 100%;
+  min-height: 540px;
+  margin: 0;
+}
+
+.atom8-test-rail {
+  display: flex;
+  min-width: 0;
+  max-height: 660px;
+  flex-direction: column;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .72);
+}
+
+.atom8-official-tests {
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, .72);
+}
+
+.atom8-official-head {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.atom8-official-head h3 {
+  font-size: .96rem;
+}
+
+.atom8-official-head p {
+  font-size: .68rem;
+}
+
+.atom8-run-all-tests {
+  min-width: 82px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: .66rem;
+}
+
+.atom8-official-suite-message {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  font-size: .66rem;
+  line-height: 1.35;
+}
+
+.atom8-official-case-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.atom8-official-case {
+  grid-template-columns: 24px 8px minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 9px;
+  cursor: default;
+}
+
+.atom8-official-case.active {
+  border-color: rgba(56, 189, 248, .62);
+  background: rgba(14, 116, 144, .1);
+}
+
+.atom8-official-case-index {
+  width: 24px;
+  height: 24px;
+}
+
+.atom8-official-case-copy strong {
+  font-size: .72rem;
+}
+
+.atom8-official-case-copy p {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 1px;
+  font-size: .62rem;
+  line-height: 1.25;
+}
+
+.atom8-official-case-copy p i {
+  display: none;
+}
+
+.atom8-case-phase {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin: 3px 0;
+}
+
+.atom8-case-phase span {
+  padding: 3px 2px;
+  border-radius: 4px;
+  background: rgba(100, 116, 139, .12);
+  color: #64748b;
+  font-size: .5rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.atom8-case-phase span.done {
+  background: rgba(16, 185, 129, .12);
+  color: #6ee7b7;
+}
+
+.atom8-case-phase span.active {
+  background: rgba(56, 189, 248, .18);
+  color: #7dd3fc;
+}
+
+.atom8-run-official-case {
+  min-width: 57px;
+  min-height: 31px;
+  padding: 0 8px;
+  font-size: .62rem;
+}
+
+.atom8-test-rail > .atom8-speed-control {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-color);
+}
+
+.atom8-connectivity-test {
+  border-style: solid;
+}
+
+.atom8-connectivity-controls {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.atom8-endpoint-flow {
+  grid-template-columns: 1fr;
+}
+
+.atom8-endpoint-flow > i {
+  justify-self: center;
+  color: #38bdf8;
+}
+
+.atom8-self-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.atom8-self-run {
+  min-height: 39px;
+  padding: 0 12px;
+  border-color: rgba(56, 189, 248, .52);
+  background: rgba(14, 116, 144, .16);
+  color: #bae6fd;
+  font-size: .69rem;
+}
+
+.atom8-self-run:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.atom8-connectivity-status {
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+
+.atom8-requirements-modal[hidden] {
+  display: none;
+}
+
+.atom8-requirements-modal {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.atom8-requirements-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, .78);
+  backdrop-filter: blur(4px);
+  cursor: default;
+}
+
+.atom8-requirements-dialog {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(82vh, 720px);
+  padding: 22px;
+  overflow-y: auto;
+  border: 1px solid rgba(96, 165, 250, .42);
+  border-radius: 14px;
+  background: #111c31;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .48);
+}
+
+.atom8-requirements-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 17px;
+}
+
+.atom8-requirements-dialog header span {
+  color: #60a5fa;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.atom8-requirements-dialog h3,
+.atom8-requirements-dialog p {
+  margin: 0;
+}
+
+.atom8-requirements-dialog h3 {
+  margin-top: 4px;
+  font-size: 1.14rem;
+}
+
+.atom8-requirements-dialog p {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: .75rem;
+}
+
+.atom8-requirements-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .7);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.atom8-requirements-dialog .atom6-parent-network {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1050px) {
+  .atom8-mode-workspace {
+    grid-template-columns: minmax(0, 1fr) 310px;
+  }
+}
+
+@media (max-width: 820px) {
+  .atom8-context-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .atom8-parent-context {
+    grid-column: 1 / -1;
+  }
+
+  .atom8-mode-workspace,
+  .atom8-mode-workspace.configure {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .atom8-test-rail {
+    max-height: none;
+  }
+
+  .atom8-official-case-list {
+    max-height: 460px;
+  }
+}
+
+@media (max-width: 560px) {
+  .atom8-parent-context {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .atom8-parent-context strong {
+    font-size: .92rem;
+  }
+
+  .atom8-mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .atom8-mode-tab {
+    padding: 0 7px;
+    font-size: .65rem;
+  }
+
+  .atom8-official-case {
+    grid-template-columns: 24px 8px minmax(0, 1fr);
+  }
+
+  .atom8-run-official-case {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .atom8-requirements-modal {
+    padding: 10px;
+  }
+
+  .atom8-requirements-dialog {
+    padding: 16px;
+  }
+}
+
 /* ============================================================
    ATOM 6 — VLSM PLANNING
    Decimal-first, progressive allocation workspace. Bit visualizations
@@ -1095,6 +1647,43 @@ body, html {
     color: var(--text-secondary);
 }
 
+.atom8-panel-actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.atom9-reset-item {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.48);
+    color: #cbd5e1;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.atom9-reset-item:hover,
+.atom9-reset-item:focus-visible {
+    border-color: #94a3b8;
+    background: rgba(51, 65, 85, 0.58);
+    color: #f8fafc;
+    outline: none;
+}
+
+.atom9-reset-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+}
+
 .atom8-populate-key {
     display: inline-flex;
     min-height: 36px;
@@ -1117,6 +1706,105 @@ body, html {
 .atom8-populate-key:focus-visible {
     border-color: #fbbf24;
     background: rgba(245, 158, 11, 0.18);
+    outline: none;
+}
+
+.atom9-reset-confirm-modal[hidden] {
+    display: none;
+}
+
+.atom9-reset-confirm-modal {
+    position: fixed;
+    z-index: 1300;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+
+.atom9-reset-backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(2, 6, 23, 0.8);
+    backdrop-filter: blur(4px);
+}
+
+.atom9-reset-confirm-dialog {
+    position: relative;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 14px;
+    width: min(500px, 100%);
+    padding: 22px;
+    border: 1px solid rgba(248, 113, 113, 0.42);
+    border-radius: 14px;
+    background: #111c31;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+}
+
+.atom9-reset-confirm-icon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid rgba(248, 113, 113, 0.38);
+    border-radius: 12px;
+    background: rgba(127, 29, 29, 0.22);
+    color: #fca5a5;
+}
+
+.atom9-reset-confirm-dialog span {
+    color: #fca5a5;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.atom9-reset-confirm-dialog h3,
+.atom9-reset-confirm-dialog p {
+    margin: 0;
+}
+
+.atom9-reset-confirm-dialog h3 {
+    margin-top: 4px;
+    font-size: 1.05rem;
+}
+
+.atom9-reset-confirm-dialog p {
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.55;
+}
+
+.atom9-reset-confirm-dialog footer {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 6px;
+}
+
+.atom9-reset-confirm {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 14px;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    background: #dc2626;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.atom9-reset-confirm:hover,
+.atom9-reset-confirm:focus-visible {
+    background: #ef4444;
     outline: none;
 }
 
@@ -1505,14 +2193,6 @@ body, html {
 .atom8-official-case-copy p i {
     color: #64748b;
     font-size: 0.58rem;
-}
-
-.atom8-official-case-message {
-    overflow: hidden;
-    color: var(--text-tertiary);
-    font-size: 0.66rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .atom8-self-test {
@@ -1904,9 +2584,14 @@ body, html {
 }
 
 @media (max-width: 620px) {
-    .atom8-panel > .panel-head .atom8-populate-key {
+    .atom8-panel > .panel-head .atom8-panel-actions {
         width: 100%;
         order: 4;
+    }
+
+    .atom8-panel-actions .atom8-populate-key,
+    .atom8-panel-actions .atom9-reset-item {
+        flex: 1 1 0;
     }
 
     .atom8-connectivity-head {
@@ -3004,6 +3689,16 @@ body, html {
     font-size: 9px;
     font-weight: 700;
     pointer-events: none;
+}
+
+.atom8-link-port-label .atom8-dce-clock-icon {
+    fill: #94a3b8;
+    stroke: rgba(15, 23, 42, 0.92);
+    stroke-width: 1.5px;
+    font-family: "Font Awesome 6 Free";
+    font-size: 8px;
+    font-weight: 900;
+    opacity: 0.9;
 }
 
 .atom8-link-port-dot {
@@ -7951,5 +8646,832 @@ button:focus-visible, input:focus-visible {
   .panel4-address-block .addr-row .addr-octet:first-child .addr-total-box,
   .panel4-address-block .addr-row .addr-octet:last-child .addr-total-box {
     border-radius: 0;
+  }
+}
+
+/* Atom 8 shared test-case language for manual and official connectivity. */
+.atom8-test-rail .atom8-test-case {
+  grid-template-columns: 24px 8px minmax(0, 1fr) 32px;
+}
+
+.atom8-case-play,
+.atom8-test-rail .atom8-case-play {
+  display: grid;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(245, 158, 11, .5);
+  border-radius: 50%;
+  background: rgba(245, 158, 11, .12);
+  color: #fcd34d;
+  cursor: pointer;
+}
+
+.atom8-case-play:hover:not(:disabled),
+.atom8-case-play:focus-visible {
+  border-color: #fbbf24;
+  background: rgba(245, 158, 11, .24);
+  outline: none;
+}
+
+.atom8-case-play:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.atom8-case-activity {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(56, 189, 248, .45);
+  border-radius: 50%;
+  background: rgba(14, 116, 144, .12);
+  color: #7dd3fc;
+}
+
+.atom8-case-activity i {
+  animation: atom8-activity-pulse 1.1s ease-in-out infinite alternate;
+}
+
+.atom8-case-activity.paused {
+  border-color: rgba(245, 158, 11, .5);
+  background: rgba(180, 83, 9, .12);
+  color: #fbbf24;
+}
+
+.atom8-case-activity.paused i {
+  animation: none;
+}
+
+@keyframes atom8-activity-pulse {
+  to { opacity: .45; }
+}
+
+.atom8-transport-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(100, 116, 139, .32);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, .6);
+}
+
+.atom8-transport-current {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.atom8-transport-current > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-size: .55rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.atom8-transport-current > span.active {
+  color: #7dd3fc;
+}
+
+.atom8-transport-current > span i {
+  font-size: .38rem;
+}
+
+.atom8-transport-current strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: .68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atom8-transport-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.atom8-transport-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(30, 41, 59, .82);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.atom8-transport-primary {
+  border-color: rgba(56, 189, 248, .5);
+  background: rgba(14, 116, 144, .18);
+  color: #bae6fd;
+}
+
+.atom8-transport-primary.is-paused {
+  border-color: rgba(245, 158, 11, .5);
+  background: rgba(180, 83, 9, .16);
+  color: #fde68a;
+}
+
+.atom8-transport-button:hover:not(:disabled),
+.atom8-transport-button:focus-visible {
+  border-color: #38bdf8;
+  color: #e0f2fe;
+  outline: none;
+}
+
+.atom8-stop-active-test:hover:not(:disabled),
+.atom8-stop-active-test:focus-visible {
+  border-color: #f87171;
+  color: #fecaca;
+}
+
+.atom8-transport-button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atom8-case-activity i { animation: none; }
+  .atom8-case-flow-packet { animation: none !important; }
+}
+
+.atom8-auto-send {
+  display: grid;
+  min-width: 86px;
+  gap: 5px;
+  justify-items: center;
+  color: #bae6fd;
+  cursor: pointer;
+  font-size: .62rem;
+  font-weight: 800;
+}
+
+.atom8-auto-send input {
+  width: 32px;
+  height: 17px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid #475569;
+  border-radius: 999px;
+  background: #1e293b;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.atom8-auto-send input::before {
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin: 2px;
+  border-radius: 50%;
+  background: #94a3b8;
+  content: '';
+  transition: .18s ease;
+}
+
+.atom8-auto-send input:checked {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, .28);
+}
+
+.atom8-auto-send input:checked::before {
+  background: #7dd3fc;
+  transform: translateX(15px);
+}
+
+.atom8-pair-composer {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px dashed rgba(56, 189, 248, .35);
+  border-radius: 9px;
+  background: rgba(14, 116, 144, .07);
+}
+
+.atom8-pair-composer .atom8-endpoint-card {
+  padding: 8px;
+}
+
+.atom8-empty-tests {
+  display: grid;
+  min-height: 118px;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  padding: 18px;
+  color: var(--text-tertiary);
+  font-size: .7rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.atom8-empty-tests i {
+  color: #38bdf8;
+  font-size: 1.2rem;
+}
+
+.atom8-test-rail .atom8-self-actions {
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+
+.atom8-clear-self-pairs {
+  display: inline-flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .7);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.atom8-clear-self-pairs:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.atom8-self-case .atom8-official-case-copy > div > span {
+  color: #7dd3fc;
+}
+
+@media (max-width: 560px) {
+  .atom8-test-rail .atom8-test-case {
+    grid-template-columns: 24px 8px minmax(0, 1fr) 32px;
+  }
+
+  .atom8-test-rail .atom8-case-play {
+    grid-column: auto;
+    width: 32px;
+  }
+}
+
+/* Compact Atom 8 list: state lives in the number and row border. */
+.atom8-test-rail .atom8-test-case {
+  box-sizing: border-box;
+  height: 96px;
+  min-height: 96px;
+  align-self: start;
+  grid-template-columns: 28px minmax(0, 1fr) 32px;
+  gap: 9px;
+}
+
+.atom8-test-rail .atom8-official-case-copy > div:first-child {
+  min-width: 0;
+}
+
+.atom8-test-rail .atom8-official-case-copy > div:first-child > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atom8-test-rail .atom8-official-case-copy > div:first-child > span {
+  flex: 0 0 auto;
+}
+
+.atom8-test-case .atom8-official-case-index {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(100, 116, 139, .1);
+  color: #94a3b8;
+  transition: border-color .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.atom8-test-case.green .atom8-official-case-index {
+  border-color: rgba(16, 185, 129, .58);
+  background: rgba(16, 185, 129, .18);
+  color: #6ee7b7;
+}
+
+.atom8-test-case.red .atom8-official-case-index {
+  border-color: rgba(239, 68, 68, .62);
+  background: rgba(239, 68, 68, .16);
+  color: #fca5a5;
+}
+
+.atom8-test-case.running .atom8-official-case-index,
+.atom8-test-case.active:not(.green):not(.red) .atom8-official-case-index {
+  border-color: rgba(56, 189, 248, .72);
+  background: rgba(14, 165, 233, .2);
+  color: #7dd3fc;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .1);
+}
+
+.atom8-test-case.running {
+  box-shadow: inset 3px 0 0 rgba(56, 189, 248, .7);
+}
+
+.atom8-test-case.green {
+  box-shadow: inset 3px 0 0 rgba(16, 185, 129, .55);
+}
+
+.atom8-test-case.red {
+  box-shadow: inset 3px 0 0 rgba(239, 68, 68, .6);
+}
+
+.atom8-test-rail .atom8-case-endpoints {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  margin: 2px 0;
+}
+
+.atom8-case-endpoints > span {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: #cbd5e1;
+  line-height: 1.25;
+}
+
+.atom8-case-endpoints em {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: .52rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.atom8-case-endpoints .selected {
+  color: #bae6fd;
+}
+
+.atom8-case-endpoints .selected em {
+  color: #38bdf8;
+}
+
+.atom8-case-endpoints .awaiting {
+  color: #64748b;
+}
+
+/* Shared visual SRC → DST route used by both Self-Test and Official Test. */
+.atom8-official-case-copy > .atom8-case-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+  align-items: stretch;
+  justify-content: initial;
+  gap: 6px;
+  min-width: 0;
+  margin: 3px 0 2px;
+}
+
+.atom8-case-endpoint-card {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid rgba(100, 116, 139, .34);
+  border-radius: 7px;
+  background: rgba(30, 41, 59, .58);
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.atom8-case-endpoint-card > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: .49rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.atom8-case-endpoint-card > span i {
+  font-size: .5rem;
+}
+
+.atom8-case-endpoint-card strong,
+.atom8-case-endpoint-card small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atom8-case-endpoint-card strong {
+  color: #e2e8f0;
+  font-size: .67rem;
+}
+
+.atom8-case-endpoint-card small {
+  color: #8ea6c8;
+  font-size: .54rem;
+}
+
+.atom8-case-endpoint-card.src > span {
+  color: #38bdf8;
+}
+
+.atom8-case-endpoint-card.dst > span {
+  color: #a78bfa;
+}
+
+.atom8-case-endpoint-card.awaiting {
+  border-style: dashed;
+  opacity: .72;
+}
+
+.atom8-case-flow {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+}
+
+.atom8-case-flow-track {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: #475569;
+  transition: background .2s ease, box-shadow .2s ease;
+}
+
+.atom8-case-flow-track::after {
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-top: 2px solid #64748b;
+  border-right: 2px solid #64748b;
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.atom8-case-flow-packet {
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  color: #7dd3fc;
+  font-size: 7px;
+  opacity: 0;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, .9));
+}
+
+.atom8-case-flow-result {
+  z-index: 3;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 1px solid #475569;
+  border-radius: 50%;
+  background: #172033;
+  color: #64748b;
+  font-size: 7px;
+}
+
+.atom8-test-case.running .atom8-case-flow-result {
+  opacity: 0;
+}
+
+.atom8-test-case.running[data-phase="request"] .atom8-case-flow-packet {
+  opacity: 1;
+  animation: atom8-case-flow-request 1.05s linear infinite;
+}
+
+.atom8-test-case.running[data-phase="reply"] .atom8-case-flow-packet {
+  opacity: 1;
+  animation: atom8-case-flow-reply 1.05s linear infinite;
+}
+
+.atom8-test-case.running[data-phase="reply"] .atom8-case-flow-track::after {
+  right: auto;
+  left: -1px;
+  transform: translateY(-50%) rotate(225deg);
+}
+
+.atom8-test-case.running[data-phase="request"] .atom8-case-flow-track,
+.atom8-test-case.running[data-phase="reply"] .atom8-case-flow-track {
+  background: #38bdf8;
+  box-shadow: 0 0 7px rgba(56, 189, 248, .45);
+}
+
+.atom8-test-case.running[data-phase="request"] .atom8-case-endpoint-card.src,
+.atom8-test-case.running[data-phase="reply"] .atom8-case-endpoint-card.dst {
+  border-color: rgba(56, 189, 248, .72);
+  background: rgba(14, 116, 144, .16);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, .08);
+}
+
+.atom8-test-case.green .atom8-case-endpoint-card {
+  border-color: rgba(16, 185, 129, .42);
+}
+
+.atom8-test-case.green .atom8-case-flow-track {
+  background: #10b981;
+}
+
+.atom8-test-case.green .atom8-case-flow-track::after {
+  border-color: #34d399;
+}
+
+.atom8-test-case.green .atom8-case-flow-result {
+  border-color: #10b981;
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+.atom8-test-case.red .atom8-case-endpoint-card {
+  border-color: rgba(239, 68, 68, .36);
+}
+
+.atom8-test-case.red .atom8-case-flow-track {
+  background: linear-gradient(90deg, #ef4444 0 42%, transparent 42% 58%, #ef4444 58% 100%);
+}
+
+.atom8-test-case.red .atom8-case-flow-track::after {
+  display: none;
+}
+
+.atom8-test-case.red .atom8-case-flow-result {
+  border-color: #ef4444;
+  background: #450a0a;
+  color: #fca5a5;
+}
+
+@keyframes atom8-case-flow-request {
+  from { left: 0; }
+  to { left: calc(100% - 7px); }
+}
+
+@keyframes atom8-case-flow-reply {
+  from { left: calc(100% - 7px); }
+  to { left: 0; }
+}
+
+.atom8-case-phase {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+.atom8-draft-case {
+  border-style: dashed;
+  border-color: rgba(56, 189, 248, .36);
+  background: rgba(14, 116, 144, .06);
+}
+
+.atom8-draft-case .atom8-official-case-index {
+  border-color: rgba(56, 189, 248, .38);
+  background: rgba(14, 165, 233, .12);
+  color: #7dd3fc;
+}
+
+.atom8-case-draft-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  align-self: center;
+  border: 1px dashed rgba(56, 189, 248, .3);
+  border-radius: 50%;
+  color: #38bdf8;
+  font-size: .68rem;
+}
+
+@media (max-width: 560px) {
+  .atom8-test-rail .atom8-test-case {
+    grid-template-columns: 28px minmax(0, 1fr) 32px;
+  }
+
+  .atom8-official-case-copy > .atom8-case-route {
+    grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .atom8-case-endpoint-card {
+    padding: 6px;
+  }
+}
+
+.atom8-self-head-actions {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 7px;
+  justify-items: stretch;
+}
+
+.atom8-self-head-actions .atom8-auto-send {
+  min-width: 78px;
+}
+
+.atom8-self-head-actions .atom8-run-all-tests {
+  min-width: 78px;
+  min-height: 31px;
+  padding: 0 9px;
+}
+
+/* Stable Atom 8 workspace geometry prevents scrollbar reflow between modes. */
+.content-scroll-area {
+  scrollbar-gutter: stable;
+}
+
+.atom8-mode-workspace,
+.atom8-mode-workspace.configure {
+  height: 660px;
+  min-height: 660px;
+}
+
+.atom8-topology-stage {
+  height: 100%;
+  min-height: 0;
+}
+
+.atom8-topology-stage > .atom8-topology {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+}
+
+.atom8-mode-workspace .atom8-test-rail {
+  box-sizing: border-box;
+  height: 100%;
+  max-height: none;
+}
+
+.atom8-topology .atom8-topology-viewport {
+  position: relative;
+  overflow: auto;
+  cursor: grab;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: none;
+}
+
+.atom8-topology .atom8-topology-viewport.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.atom8-topology .atom8-topology-viewport::-webkit-scrollbar,
+.atom8-test-rail .atom8-official-case-list::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.atom8-test-rail .atom8-official-case-list {
+  align-content: start;
+  grid-auto-rows: max-content;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.atom8-topology-zoom-plane {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.atom8-topology-zoom-plane > .atom8-topology-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  transform-origin: top left;
+}
+
+.atom8-topology-heading-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.atom8-topology-heading-tools .atom8-topology-instruction {
+  max-width: 310px;
+  color: var(--text-secondary);
+  font-size: .72rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.atom8-mode-workspace:not(.configure) .atom8-topology-heading-tools .atom8-topology-instruction {
+  display: none;
+}
+
+.atom8-zoom-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, .72);
+}
+
+.atom8-zoom-controls button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.atom8-zoom-controls button:hover,
+.atom8-zoom-controls button:focus-visible {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, .12);
+}
+
+.atom8-zoom-controls input {
+  width: 88px;
+  accent-color: #38bdf8;
+}
+
+.atom8-zoom-controls output {
+  min-width: 34px;
+  color: #bae6fd;
+  font: 700 .66rem var(--font-mono);
+  text-align: right;
+}
+
+/* Compact scenario summary: primary address and score read as anchors. */
+.atom8-parent-context {
+  justify-content: flex-start;
+  gap: clamp(18px, 3vw, 40px);
+}
+
+.atom8-score-context {
+  min-width: 118px;
+  border: 1px solid rgba(245, 158, 11, .5);
+  background: linear-gradient(145deg, rgba(245, 158, 11, .18), rgba(120, 53, 15, .12));
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, .06), 0 5px 18px rgba(0, 0, 0, .16);
+}
+
+.atom8-score-context small {
+  color: #fcd34d;
+  font-size: .6rem;
+}
+
+.atom8-score-context strong {
+  color: #fbbf24;
+  font-size: 1.18rem;
+  line-height: 1;
+  text-shadow: 0 0 16px rgba(245, 158, 11, .25);
+}
+
+@media (max-width: 820px) {
+  .atom8-mode-workspace,
+  .atom8-mode-workspace.configure {
+    height: auto;
+    min-height: 0;
+  }
+
+  .atom8-topology-stage > .atom8-topology {
+    min-height: 540px;
+  }
+
+  .atom8-topology-heading-tools .atom8-topology-instruction {
+    display: none;
+  }
+
+  .atom8-mode-workspace .atom8-test-rail {
+    height: auto;
   }
 }

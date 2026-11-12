@@ -172,7 +172,7 @@ const QUESTION_CONFIG = {
     // the generic generator derives LAN/WAN requirements, subnet sizes,
     // parent-network fit, allocation stages, and validation keys.
     atom6: {
-        enabled: true,
+        enabled: false,
         minLans: 3,
         maxLans: 5,
         minWans: 1,
@@ -251,7 +251,7 @@ const QUESTION_CONFIG = {
     // here so instructors can author a different capstone without changing
     // the generator or renderer.
     atom7: {
-        enabled: true,
+        enabled: false,
         seed: {
             strategy: 'per-user-session',
             prefix: 'atom7-requirement',
@@ -316,7 +316,7 @@ const QUESTION_CONFIG = {
     // checks capacity, containment, uniqueness, gateways, WANs, and static
     // routes instead of comparing against Atom 6's canonical allocation.
     atom8: {
-        enabled: true,
+        enabled: false,
         representativeHosts: { min: 2, max: 3 },
         initialRouteEntries: 1,
         maxStaticRoutesPerRouter: 12,
@@ -326,10 +326,19 @@ const QUESTION_CONFIG = {
         answerKey: {
             // Temporary instructor/demo utility. Set to false to remove the
             // button without changing the Atom 8 renderer or validation.
-            showPopulateButton: false
+            showPopulateButton: true
+        },
+        topologyView: {
+            defaultZoom: 1,
+            minZoom: 0.65,
+            maxZoom: 1.4,
+            zoomStep: 0.05,
+            canvasHeight: 500
         },
         connectivityTest: {
             enabled: true,
+            autoSendDefault: true,
+            selfTestRunAllEnabled: true,
             defaultSpeed: 1,
             minSpeed: 0.5,
             maxSpeed: 2,
@@ -339,13 +348,15 @@ const QUESTION_CONFIG = {
             officialTestCases: {
                 enabled: true,
                 runAllEnabled: true,
-                cases: [
-                    { id: 'lan1-lan2', label: 'Local routing check', source: { lan: 1, host: 1 }, destination: { lan: 2, host: 1 }, points: 5 },
-                    { id: 'lan1-lan3', label: 'Router 1 to Router 2', source: { lan: 1, host: 1 }, destination: { lan: 3, host: 1 }, points: 5 },
-                    { id: 'lan3-lan4', label: 'Router 2 to Router 3', source: { lan: 3, host: 1 }, destination: { lan: 4, host: 1 }, points: 5 },
-                    { id: 'lan2-lan5', label: 'End-to-end forward path', source: { lan: 2, host: 2 }, destination: { lan: 5, host: 2 }, points: 5 },
-                    { id: 'lan5-lan1', label: 'End-to-end return path', source: { lan: 5, host: 1 }, destination: { lan: 1, host: 2 }, points: 5 }
-                ]
+                pointsPerCase: 5,
+                seedSalt: 'official-connectivity-v1',
+                randomizeDirection: true,
+                randomizeRepresentativeHosts: true,
+                generation: {
+                    oneCasePerLan: true,
+                    allSameRouterLanPairs: true,
+                    allDifferentRouterLanPairs: true
+                }
             }
         },
         lanInterfaceNames: [
@@ -369,6 +380,75 @@ const QUESTION_CONFIG = {
             ['Se0/0/0']
         ],
         dceRouterByWan: [1, 2]
+    },
+
+    // Atom 9: five standalone, progressively harder in-app deployment
+    // items. It reuses Atom 8's device/configuration/testing engine, but
+    // every item owns its scenario, answers, official suite, and score.
+    atom9: {
+        enabled: true,
+        seed: {
+            salt: 'standalone-deployment-v1'
+        },
+        minLans: 2,
+        maxLans: 6,
+        minWans: 0,
+        maxWans: 3,
+        topology: {
+            minRouters: 1,
+            maxRouters: 4,
+            maxLanPortsPerRouter: 2,
+            maxWanPortsPerRouter: 2
+        },
+        wanRequirement: {
+            requiredUsableIp: 2,
+            allocationCidr: 30,
+            useSharedSourceSubnet: true,
+            equivalentOrdering: true
+        },
+        // These ranges keep every generated six-LAN item feasible inside a
+        // Class C /24 while still producing visibly different VLSM blocks.
+        lanProfiles: [
+            { id: 'large', minHosts: 20, maxHosts: 30, weight: 2 },
+            { id: 'medium', minHosts: 10, maxHosts: 19, weight: 3 },
+            { id: 'small', minHosts: 5, maxHosts: 9, weight: 4 }
+        ],
+        lanNames: [
+            'Admissions', 'Administration', 'Accounting', 'Computer Laboratory',
+            'Faculty', 'Library', 'Operations', 'Records', 'Registrar',
+            'Research', 'Student Services', 'Training Center'
+        ],
+        randomizeLanRouterAssignment: true,
+        items: [
+            {
+                id: 'single-router', label: 'Item 1 · Local Routing',
+                routerCount: 1, lanCount: 2, wanCount: 0,
+                lanPortsPerRouter: [2], wanRouterPairs: []
+            },
+            {
+                id: 'two-router-basic', label: 'Item 2 · First WAN',
+                routerCount: 2, lanCount: 2, wanCount: 1,
+                lanPortsPerRouter: [1, 1], wanRouterPairs: [[1, 2]]
+            },
+            {
+                id: 'two-router-full', label: 'Item 3 · Dual LAN Routers',
+                routerCount: 2, lanCount: 4, wanCount: 1,
+                lanPortsPerRouter: [2, 2], wanRouterPairs: [[1, 2]]
+            },
+            {
+                id: 'three-router-chain', label: 'Item 4 · Three-Router Chain',
+                routerCount: 3, lanCount: 3, wanCount: 2,
+                lanPortsPerRouter: [1, 1, 1], wanRouterPairs: [[1, 2], [2, 3]]
+            },
+            {
+                id: 'four-router-capstone', label: 'Item 5 · Four-Router Capstone',
+                routerCount: 4, lanCount: 6, wanCount: 3,
+                lanPortsPerRouter: [2, 2, 1, 1], wanRouterPairs: [[1, 2], [2, 3], [3, 4]]
+            }
+        ],
+        parentPools: [
+            { cidr: 24, octetRanges: [[193, 223], [0, 254], [0, 254], [0, 255]] }
+        ]
     },
 
     // Grading
@@ -400,8 +480,14 @@ let currentPracticeSeed = null;
 let currentQuestionSeed = null;
 let currentAtom7Seed = null;
 let currentAtom7SeedOwner = null;
+let currentAtom9Seed = null;
+let currentAtom9SeedOwner = null;
 let atom7Scenario = null;
 let atom8Model = null;
+let atom8GeneratedOfficialCases = [];
+let atom9QuestionIds = [];
+let atom9ActiveIndex = 0;
+let activeDeploymentExerciseKey = 'atom8-main';
 
 // Builds a seed string that's different on every call — timestamp plus a
 // random component, so even two logins in the same millisecond can't
@@ -417,6 +503,11 @@ function generateAtom7Seed() {
         return String(cfg.value || `${prefix}-shared`);
     }
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
+function generateAtom9Seed() {
+    const cfg = QUESTION_CONFIG.atom9?.seed || {};
+    return `atom9-${String(cfg.salt || 'standalone')}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 }
 
 function loadAppPreferences() {
@@ -1453,6 +1544,13 @@ async function loadAllExercises() {
         currentAtom7Seed = null;
         currentAtom7SeedOwner = currentUser;
     }
+    if (resumedSession && resumedSession.atom9Seed) {
+        currentAtom9Seed = resumedSession.atom9Seed;
+        currentAtom9SeedOwner = currentUser;
+    } else if (currentAtom9SeedOwner !== currentUser) {
+        currentAtom9Seed = null;
+        currentAtom9SeedOwner = currentUser;
+    }
 
     // Question seeding is independent of Practice/Exam mode:
     //   - 'fixed'  -> the same constant seed every time, so every student
@@ -1575,11 +1673,31 @@ async function loadAllExercises() {
 
     if (QUESTION_CONFIG.atom8?.enabled && atom7Scenario) {
         atom8Model = atom8BuildModel(atom7Scenario, currentAtom7Seed);
-        exerciseData['atom8-main'] = atom8BuildExerciseData(atom7Scenario, atom8Model);
+        atom8GeneratedOfficialCases = atom8GenerateOfficialCases(atom7Scenario, atom8Model, currentAtom7Seed);
+        exerciseData['atom8-main'] = atom8BuildExerciseData(atom7Scenario, atom8Model, atom8GeneratedOfficialCases);
         renderAtom8View();
     } else {
         atom8Model = null;
+        atom8GeneratedOfficialCases = [];
         renderAtom8View();
+    }
+
+    if (QUESTION_CONFIG.atom9?.enabled) {
+        if (!currentAtom9Seed) currentAtom9Seed = generateAtom9Seed();
+        const atom9List = buildAtom9QuestionList(currentAtom9Seed);
+        atom9QuestionIds = atom9List.map(item => item.name);
+        atom9List.forEach(item => {
+            exerciseData[item.name] = atom8BuildExerciseData(item.scenario, item.model, item.officialCases, {
+                type: 'atom9',
+                label: item.label,
+                phase: 'Atom 9 · Standalone Deployment',
+                generatedOfficialCases: item.officialCases
+            });
+        });
+        renderAtom9View();
+    } else {
+        atom9QuestionIds = [];
+        renderAtom9View();
     }
 
     document.getElementById('loader').style.display = 'none';
@@ -1617,6 +1735,7 @@ async function loadAllExercises() {
     syncAtom5ViewDOM();
     syncAtom6ViewDOM();
     syncAtom8ViewDOM();
+    syncAtom9ViewDOM();
 
     // Persist the seed immediately and synchronize any independent setting
     // changes (for example, turning the timer off for an existing session).
@@ -2469,6 +2588,18 @@ function showAtomQuestion(atomKey, index, opts) {
     const state = ATOM_PAGINATION[atomKey];
     if (!state || !state.total) return;
     const safeIndex = Math.max(0, Math.min(index, state.total - 1));
+    if (atomKey === 'atom9') {
+        if (atom8PingState.running || atom8OfficialRunAllActive || atom8SelfRunAllActive) {
+            renderAtomPaginationBar('atom9');
+            return;
+        }
+        state.current = safeIndex;
+        atom9SelectItem(safeIndex, { keepMode: true, fromPagination: true });
+        if (!opts || opts.scroll !== false) {
+            document.getElementById('atom9Container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+    }
     state.current = safeIndex;
 
     const panels = getAtomPanels(atomKey);
@@ -2505,7 +2636,7 @@ function initAtomPagination(atomKey) {
 // (Exercises, Subnet Visualizer, an ungraded Atom placeholder, or another
 // Atom) must explicitly hide all four and then show at most one.
 function hideAllAtomPaginationBars() {
-    ['atom1', 'atom2', 'atom3', 'atom4', 'atom5', 'atom6'].forEach(key => {
+    ['atom1', 'atom2', 'atom3', 'atom4', 'atom5', 'atom6', 'atom9'].forEach(key => {
         const bar = document.getElementById(key + 'PaginationContainer');
         if (bar) bar.style.display = 'none';
     });
@@ -2859,6 +2990,7 @@ function showAtom1Page() {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('atom1View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -3328,6 +3460,7 @@ function showAtom2Page() {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
 
     showAtomPaginationBar('atom2');
 
@@ -4595,7 +4728,7 @@ function syncAtom4ViewDOM() {
 function showAtom4Page() {
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom4')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom5View', 'atom6View', 'atom7View', 'atom8View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom5View', 'atom6View', 'atom7View', 'atom8View', 'atom9View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
@@ -4625,6 +4758,7 @@ function showAtom3Page() {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('atom3View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -5545,6 +5679,7 @@ function showAtom5Page() {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('atom5View').style.display = 'flex';
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
 
@@ -5714,7 +5849,10 @@ function atom6BuildTopology(level, cfg, rng) {
     const names = atom6Shuffle(cfg.lanNames, rng).slice(0, lanTotal);
     const profilesBySize = [...cfg.lanProfiles].sort((a, b) => Number(b.maxHosts) - Number(a.maxHosts));
     const lans = [];
-    const lanRouterIndices = lanPortsPerRouter.flatMap((count, routerIndex) => Array.from({ length: count }, () => routerIndex));
+    let lanRouterIndices = lanPortsPerRouter.flatMap((count, routerIndex) => Array.from({ length: count }, () => routerIndex));
+    if (level.randomizeLanRouterAssignment === true || cfg.randomizeLanRouterAssignment === true) {
+        lanRouterIndices = atom6Shuffle(lanRouterIndices, rng);
+    }
     for (let i = 0; i < lanTotal; i++) {
         const profile = i < profilesBySize.length ? profilesBySize[i] : atom6PickWeighted(rng, cfg.lanProfiles);
         const hosts = randInt(rng, Number(profile.minHosts), Number(profile.maxHosts));
@@ -5770,6 +5908,23 @@ function atom6AllocateScenario(parent, topology, cfg) {
 
     const linkCidr = atom6WanAllocationCidr(cfg);
     const linkCount = topology.wans.length;
+    if (linkCount === 0) {
+        pool.sort((a, b) => a.networkInt - b.networkInt);
+        return {
+            sortedLans,
+            lanAllocations,
+            wan: {
+                source: null,
+                generated: [],
+                assignments: [],
+                requiredSourceCidr: null,
+                requiredBlockCount: 0,
+                sourceBlockCapacity: 0,
+                skippedBeforeSource: [],
+                poolAfter: pool.map(block => ({ ...block }))
+            }
+        };
+    }
     const requiredSourceCidr = atom6RequiredSourceCidr(linkCidr, linkCount);
     pool.sort((a, b) => a.networkInt - b.networkInt);
     // Select by address order, but only when one source can produce the full
@@ -5851,6 +6006,30 @@ function buildAtom6QuestionList(seedStr) {
         }
     });
     return list;
+}
+
+function buildAtom9QuestionList(seedStr) {
+    const cfg = QUESTION_CONFIG.atom9;
+    if (!cfg?.enabled) return [];
+    return (cfg.items || []).map((profile, index) => {
+        const itemSeed = String(seedStr || '') + '::atom9::' + profile.id;
+        const rng = mulberry32(hashStringToSeed(itemSeed));
+        const level = {
+            ...profile,
+            parentPools: profile.parentPools || cfg.parentPools,
+            randomizeLanRouterAssignment: profile.randomizeLanRouterAssignment ?? cfg.randomizeLanRouterAssignment
+        };
+        const scenario = atom6GenerateScenario(level, cfg, rng, index);
+        const model = atom8BuildModel(scenario, itemSeed);
+        const officialCases = atom8GenerateOfficialCases(scenario, model, itemSeed);
+        return {
+            name: 'atom9-item-' + (index + 1),
+            label: profile.label || ('Item ' + (index + 1)),
+            scenario,
+            model,
+            officialCases
+        };
+    });
 }
 
 function atom6EmptyIp() { return ['', '', '', '']; }
@@ -5982,11 +6161,12 @@ function atom6BlockSummary(block, label) {
 function atom6BuildSerialLightningPath(x1, x2, baseY, centerY = baseY) {
     const pointX = ratio => x1 + (x2 - x1) * ratio;
     const stepHeight = Math.min(9, Math.max(6, Math.abs(x2 - x1) * 0.045));
+    const lowerStepY = centerY + stepHeight / 2;
+    const upperStepY = centerY - stepHeight / 2;
     return 'M ' + x1 + ' ' + baseY +
-        ' L ' + pointX(0.50) + ' ' + centerY +
-        ' L ' + pointX(0.47) + ' ' + (centerY - stepHeight) +
-        ' L ' + pointX(0.58) + ' ' + (centerY - stepHeight + 1) +
-        ' L ' + pointX(0.97) + ' ' + (centerY - stepHeight + 1) +
+        ' L ' + pointX(0.50) + ' ' + lowerStepY +
+        ' L ' + pointX(0.47) + ' ' + upperStepY +
+        ' L ' + pointX(0.58) + ' ' + (upperStepY + 1) +
         ' L ' + x2 + ' ' + baseY;
 }
 
@@ -6232,8 +6412,15 @@ function buildAtom6PanelHtml(qid, ex, index) {
 
 function renderAtom6View(atom6List) {
     const container = document.getElementById('atom6QuestionsContainer');
+    const nav = document.getElementById('nav-atom6');
+    const enabled = !!(QUESTION_CONFIG.atom6?.enabled && atom6List.length);
+    if (nav) nav.style.display = enabled ? '' : 'none';
     if (!container) return;
     atom6QuestionIds = atom6List.map(item => item.name);
+    if (!enabled) {
+        container.innerHTML = '';
+        return;
+    }
     container.innerHTML = atom6QuestionIds.map((qid, i) => buildAtom6PanelHtml(qid, exerciseData[qid], i + 1)).join('');
     if (!atom6ActionsDelegated) {
         atom6ActionsDelegated = true;
@@ -6441,9 +6628,10 @@ function syncAtom6ViewDOM() {
 }
 
 function showAtom6Page() {
+    if (!QUESTION_CONFIG.atom6?.enabled || !atom6QuestionIds.length) return;
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom6')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom7View', 'atom8View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom7View', 'atom8View', 'atom9View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
@@ -6494,7 +6682,7 @@ function showAtom7Page() {
     if (!QUESTION_CONFIG.atom7?.enabled || !atom7Scenario) return;
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom7')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom8View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom8View', 'atom9View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
@@ -6523,44 +6711,145 @@ const atom8PingState = {
     sourceId: null,
     destinationId: null,
     running: false,
+    paused: false,
+    stopRequested: false,
     phase: 'idle',
     outcome: null,
     message: 'Select Test Connection to begin.'
 };
 let atom8OfficialRunAllActive = false;
+let atom8SelfRunAllActive = false;
+let atom8RestartRequest = null;
+let atom8WorkspaceMode = 'configure';
+let atom8RenderedWorkspaceMode = 'configure';
+const atom8ListScrollByMode = { 'self-test': 0, official: 0 };
+const atom8TopologyPanByMode = {
+    configure: { x: 0, y: 0 },
+    'self-test': { x: 0, y: 0 },
+    official: { x: 0, y: 0 }
+};
+let atom8TopologyPanState = null;
+let atom8TopologyZoom = Number(QUESTION_CONFIG.atom8.topologyView?.defaultZoom) || 1;
 
-function atom8OfficialCases() {
-    const suite = QUESTION_CONFIG.atom8.connectivityTest?.officialTestCases;
-    if (!suite?.enabled || !Array.isArray(suite.cases)) return [];
-    return suite.cases.filter(testCase => testCase && testCase.id && Number(testCase.points) > 0);
+function atom8CurrentExercise() {
+    return exerciseData[activeDeploymentExerciseKey] || null;
 }
 
-function atom8InitialOfficialTests() {
+function atom8CurrentContainer() {
+    return document.getElementById(activeDeploymentExerciseKey.startsWith('atom9-') ? 'atom9Container' : 'atom8Container');
+}
+
+function atom8CurrentContainerSelector() {
+    return activeDeploymentExerciseKey.startsWith('atom9-') ? '#atom9Container' : '#atom8Container';
+}
+
+function atom8OfficialCases(ex = atom8CurrentExercise()) {
+    const suite = QUESTION_CONFIG.atom8.connectivityTest?.officialTestCases;
+    if (!suite?.enabled) return [];
+    const persisted = ex?.atom8State?.officialTests?.cases;
+    const fallback = ex?.generatedOfficialCases || atom8GeneratedOfficialCases;
+    // Every Atom 9 item owns a topology-specific suite. Never allow a state
+    // reset from the shared Atom 8 engine to substitute another item's cases.
+    const cases = ex?.type === 'atom9'
+        ? fallback
+        : (Array.isArray(persisted) && persisted.length ? persisted : fallback);
+    return cases.filter(testCase => testCase && testCase.id && Number(testCase.points) > 0);
+}
+
+function atom8InitialOfficialTests(cases = atom8GeneratedOfficialCases) {
     return {
         message: 'Official tests have not been run for this configuration.',
-        results: Object.fromEntries(atom8OfficialCases().map(testCase => [testCase.id, {
+        cases: cases.map(testCase => ({ ...testCase, source: { ...testCase.source }, destination: { ...testCase.destination } })),
+        results: Object.fromEntries(cases.map(testCase => [testCase.id, {
             status: 'gray', message: 'Not tested'
         }]))
     };
+}
+
+function atom8GenerateOfficialCases(scenario, model, seedStr) {
+    const cfg = QUESTION_CONFIG.atom8.connectivityTest?.officialTestCases;
+    if (!cfg?.enabled || !scenario || !model) return [];
+    const generation = cfg.generation || {};
+    const rng = mulberry32(hashStringToSeed(String(seedStr || '') + '::atom8-tests::' + String(cfg.seedSalt || '')));
+    const points = Math.max(1, Number(cfg.pointsPerCase) || 1);
+    const lans = [...scenario.lans].sort((a, b) => a.number - b.number);
+    const hostsFor = lan => model.hosts.filter(host => host.lanId === lan.id).sort((a, b) => a.number - b.number);
+    const pickHostNumber = (lan, excluded = null) => {
+        const candidates = hostsFor(lan).filter(host => host.number !== excluded);
+        if (!candidates.length) return null;
+        if (cfg.randomizeRepresentativeHosts === false) return candidates[0].number;
+        return candidates[randInt(rng, 0, candidates.length - 1)].number;
+    };
+    const orient = (lanA, lanB) => cfg.randomizeDirection !== false && rng() < 0.5 ? [lanB, lanA] : [lanA, lanB];
+    const makeCase = (category, lanA, lanB, label) => {
+        const [sourceLan, destinationLan] = orient(lanA, lanB);
+        const sourceHost = pickHostNumber(sourceLan);
+        const destinationHost = pickHostNumber(destinationLan, sourceLan.id === destinationLan.id ? sourceHost : null);
+        if (sourceHost === null || destinationHost === null) return null;
+        const pairKey = lanA.id === lanB.id ? 'lan' + lanA.number : 'lan' + Math.min(lanA.number, lanB.number) + '-lan' + Math.max(lanA.number, lanB.number);
+        return {
+            id: category + '-' + pairKey,
+            category,
+            label,
+            source: { lan: sourceLan.number, host: sourceHost },
+            destination: { lan: destinationLan.number, host: destinationHost },
+            points
+        };
+    };
+    const cases = [];
+    if (generation.oneCasePerLan !== false) {
+        lans.forEach(lan => {
+            const testCase = makeCase('same-lan', lan, lan, 'Same LAN · LAN ' + lan.number);
+            if (testCase) cases.push(testCase);
+        });
+    }
+    if (generation.allSameRouterLanPairs !== false) {
+        scenario.routers.forEach(router => {
+            const routerLans = lans.filter(lan => lan.routerId === router.id);
+            for (let i = 0; i < routerLans.length; i++) {
+                for (let j = i + 1; j < routerLans.length; j++) {
+                    const testCase = makeCase('same-router', routerLans[i], routerLans[j], 'Same router · LAN ' + routerLans[i].number + ' ↔ LAN ' + routerLans[j].number);
+                    if (testCase) cases.push(testCase);
+                }
+            }
+        });
+    }
+    if (generation.allDifferentRouterLanPairs !== false) {
+        for (let i = 0; i < lans.length; i++) {
+            for (let j = i + 1; j < lans.length; j++) {
+                if (lans[i].routerId === lans[j].routerId) continue;
+                const testCase = makeCase('different-router', lans[i], lans[j], 'Different routers · LAN ' + lans[i].number + ' ↔ LAN ' + lans[j].number);
+                if (testCase) cases.push(testCase);
+            }
+        }
+    }
+    return cases;
 }
 
 function atom8BuildModel(scenario, seedStr) {
     const cfg = QUESTION_CONFIG.atom8;
     const rng = mulberry32(hashStringToSeed(String(seedStr || '') + '::atom8-devices'));
     const routers = scenario.routers.map((router, routerIndex) => {
-        const lanPorts = router.lanIds.map((lanId, i) => ({
-            id: 'lan-port-' + (i + 1), role: 'lan', targetId: lanId,
-            name: cfg.lanInterfaceNames[routerIndex]?.[i] || ('GigabitEthernet0/' + i),
-            shortName: cfg.lanInterfaceShortNames[routerIndex]?.[i] || cfg.lanInterfaceNames[routerIndex]?.[i],
-            dce: false
-        }));
+        const lanPorts = router.lanIds.map((lanId, i) => {
+            const name = cfg.lanInterfaceNames[routerIndex]?.[i] || ('GigabitEthernet0/' + i);
+            return {
+                id: 'lan-port-' + (i + 1), role: 'lan', targetId: lanId,
+                name,
+                shortName: cfg.lanInterfaceShortNames[routerIndex]?.[i] || ('Ga0/' + i),
+                dce: false
+            };
+        });
         const wanPorts = router.wanIds.map((wanId, i) => {
             const wan = scenario.wans.find(item => item.id === wanId);
+            const name = cfg.wanInterfaceNames[routerIndex]?.[i] || ('Serial0/0/' + i);
+            const configuredDceRouter = Number(cfg.dceRouterByWan?.[wan.number - 1]);
             return {
                 id: 'wan-port-' + (i + 1), role: 'wan', targetId: wanId,
-                name: cfg.wanInterfaceNames[routerIndex]?.[i] || ('Serial0/0/' + i),
-                shortName: cfg.wanInterfaceShortNames[routerIndex]?.[i] || cfg.wanInterfaceNames[routerIndex]?.[i],
-                dce: Number(cfg.dceRouterByWan[wan.number - 1]) === router.number
+                name,
+                shortName: cfg.wanInterfaceShortNames[routerIndex]?.[i] || ('Se0/0/' + i),
+                dce: Number.isFinite(configuredDceRouter) && configuredDceRouter > 0
+                    ? configuredDceRouter === router.number
+                    : wan.fromRouterId === router.id
             };
         });
         return {
@@ -6578,7 +6867,7 @@ function atom8BuildModel(scenario, seedStr) {
     return { routers, hosts };
 }
 
-function atom8InitialState(model) {
+function atom8InitialState(model, officialCases = atom8GeneratedOfficialCases) {
     const initialRouteEntries = Math.max(1, Number(QUESTION_CONFIG.atom8.initialRouteEntries) || 1);
     const maxRouteEntries = Math.max(1, Number(QUESTION_CONFIG.atom8.maxStaticRoutesPerRouter) || 1);
     const routers = {};
@@ -6597,28 +6886,35 @@ function atom8InitialState(model) {
     return {
         routers,
         hosts,
-        connectivityTest: { speed: Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1 },
-        officialTests: atom8InitialOfficialTests(),
+        connectivityTest: {
+            speed: Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1,
+            autoSend: QUESTION_CONFIG.atom8.connectivityTest?.autoSendDefault !== false,
+            pairs: []
+        },
+        officialTests: atom8InitialOfficialTests(officialCases),
         validation: { ports: {}, hosts: {}, routers: {}, routes: {} }
     };
 }
 
-function atom8PossibleScore() {
-    return atom8OfficialCases().reduce((sum, testCase) => sum + Number(testCase.points), 0);
+function atom8PossibleScore(cases = atom8GeneratedOfficialCases) {
+    return cases.reduce((sum, testCase) => sum + Number(testCase.points), 0);
 }
 
-function atom8BuildExerciseData(scenario, model) {
-    const possible = atom8PossibleScore();
+function atom8BuildExerciseData(scenario, model, officialCases = atom8GeneratedOfficialCases, options = {}) {
+    const possible = atom8PossibleScore(officialCases);
+    const atom8State = atom8InitialState(model, officialCases);
     return {
-        type: 'atom8', label: 'Atom 8 · In-App Deployment', phase: 'Atom 8 · In-App Deployment',
+        type: options.type || 'atom8', label: options.label || 'Atom 8 · In-App Deployment', phase: options.phase || 'Atom 8 · In-App Deployment',
         scenario, model, answers: Array.from({ length: possible }, () => 'valid'),
         score: 0, locked: false, isPartial: false, isConversionQuestion: true,
-        userAnswer: '', atom8State: atom8InitialState(model)
+        userAnswer: JSON.stringify(atom8State), atom8State,
+        generatedOfficialCases: options.generatedOfficialCases || officialCases
     };
 }
 
 function atom8RestoreState(ex) {
-    if (!ex?.userAnswer) return ex?.atom8State || atom8InitialState(ex.model);
+    const generatedCases = ex?.generatedOfficialCases || atom8GeneratedOfficialCases;
+    if (!ex?.userAnswer) return ex?.atom8State || atom8InitialState(ex.model, generatedCases);
     try {
         const restored = JSON.parse(ex.userAnswer);
         ex.model.routers.forEach(router => {
@@ -6629,19 +6925,34 @@ function atom8RestoreState(ex) {
             if (!hasRouteInput) routerState.routes = [{ destination: '', mask: '', nextHop: '' }];
         });
         if (!restored.connectivityTest) {
-            restored.connectivityTest = { speed: Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1 };
+            restored.connectivityTest = {};
         }
-        const savedResults = restored.officialTests?.results || {};
+        restored.connectivityTest.speed = Number(restored.connectivityTest.speed) || Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1;
+        if (typeof restored.connectivityTest.autoSend !== 'boolean') restored.connectivityTest.autoSend = QUESTION_CONFIG.atom8.connectivityTest?.autoSendDefault !== false;
+        restored.connectivityTest.pairs = Array.isArray(restored.connectivityTest.pairs) ? restored.connectivityTest.pairs : [];
+        const savedCases = Array.isArray(restored.officialTests?.cases) ? restored.officialTests.cases.filter(testCase =>
+            testCase && testCase.id && testCase.source && testCase.destination && Number(testCase.points) > 0
+        ) : [];
+        const useGeneratedCases = ex.type === 'atom9';
+        const restoredCases = useGeneratedCases ? generatedCases : (savedCases.length ? savedCases : generatedCases);
+        const savedResults = savedCases.length ? (restored.officialTests?.results || {}) : {};
+        const repairedSuite = useGeneratedCases && (
+            savedCases.length !== generatedCases.length ||
+            savedCases.some((testCase, index) => testCase.id !== generatedCases[index]?.id)
+        );
         restored.officialTests = {
-            message: restored.officialTests?.message || 'Official tests have not been run for this configuration.',
-            results: Object.fromEntries(atom8OfficialCases().map(testCase => [testCase.id, savedResults[testCase.id] || {
+            message: repairedSuite
+                ? 'The official test suite was repaired for this item.'
+                : (savedCases.length ? (restored.officialTests?.message || 'Official tests have not been run for this configuration.') : 'A new persistent official test suite was generated for this session.'),
+            cases: restoredCases.map(testCase => ({ ...testCase, source: { ...testCase.source }, destination: { ...testCase.destination } })),
+            results: Object.fromEntries(restoredCases.map(testCase => [testCase.id, savedResults[testCase.id] || {
                 status: 'gray', message: 'Not tested'
             }]))
         };
         return restored;
     }
     catch (err) { console.warn('Could not restore Atom 8 state:', err); }
-    return atom8InitialState(ex.model);
+    return atom8InitialState(ex.model, generatedCases);
 }
 
 function atom8ParseIp(value) {
@@ -6692,14 +7003,23 @@ function atom8FirstHop(scenario, startId, destinationId) {
 
 function atom8ApplyOfficialScore(ex) {
     const results = ex.atom8State.officialTests?.results || {};
-    ex.score = atom8OfficialCases().reduce((sum, testCase) =>
+    ex.score = atom8OfficialCases(ex).reduce((sum, testCase) =>
         sum + (results[testCase.id]?.status === 'green' ? Number(testCase.points) : 0), 0);
     ex.isPartial = ex.score > 0 && ex.score < ex.answers.length;
     ex.locked = ex.answers.length > 0 && ex.score === ex.answers.length;
 }
 
+function atom8CelebratePerfectItem(ex, previousScore) {
+    const possible = Number(ex?.answers?.length || 0);
+    const wasPerfect = possible > 0 && Number(previousScore || 0) === possible;
+    const isPerfect = possible > 0 && Number(ex?.score || 0) === possible;
+    if (!wasPerfect && isPerfect && (ex.type === 'atom8' || ex.type === 'atom9')) {
+        triggerBigConfetti();
+    }
+}
+
 function atom8InvalidateOfficialTests(ex, message = 'Network configuration changed. Run the official tests again.') {
-    ex.atom8State.officialTests = atom8InitialOfficialTests();
+    ex.atom8State.officialTests = atom8InitialOfficialTests(atom8OfficialCases(ex));
     ex.atom8State.officialTests.message = message;
     atom8ApplyOfficialScore(ex);
     atom8CancelPingAnimation();
@@ -6800,13 +7120,19 @@ function atom8Validate(ex) {
             const valid = !!(destination && destinationInput && destinationInput.text === destination.network && nextHop && peerWan && validation.ports[peerWan.key] === 'green');
             return { input, destination, nextHop, peerWan, valid };
         });
-        const routesWellFormed = routeRecords.length > 0 && routeRecords.every(route => route.valid);
-        const remoteNetworksReachable = scenario.lans.filter(lan => lan.routerId !== router.id).every(lan => {
+        const remoteLans = scenario.lans.filter(lan => lan.routerId !== router.id);
+        const configuredRouteRecords = routeRecords.filter(route =>
+            route.input.destination || route.input.mask || route.input.nextHop
+        );
+        const routesWellFormed = remoteLans.length === 0
+            ? configuredRouteRecords.length === 0
+            : configuredRouteRecords.length > 0 && configuredRouteRecords.every(route => route.valid);
+        const remoteNetworksReachable = remoteLans.every(lan => {
             const destinationPort = portRecords.find(record => record.port.role === 'lan' && record.port.targetId === lan.id && validation.ports[record.key] === 'green');
             const hop = atom8FirstHop(scenario, router.id, lan.routerId);
             if (!destinationPort || !hop) return false;
             const destinationEnd = destinationPort.block.networkInt + destinationPort.block.availableIp - 1;
-            const candidates = routeRecords.filter(route => route.valid &&
+            const candidates = configuredRouteRecords.filter(route => route.valid &&
                 route.destination.networkInt <= destinationPort.block.networkInt &&
                 route.destination.networkInt + route.destination.availableIp - 1 >= destinationEnd);
             if (!candidates.length) return false;
@@ -6927,7 +7253,13 @@ function atom8PingPoint(canvas, node) {
     if (!element) return null;
     const canvasRect = canvas.getBoundingClientRect();
     const rect = element.getBoundingClientRect();
-    return { element, x: rect.left - canvasRect.left + rect.width / 2, y: rect.top - canvasRect.top + rect.height / 2 };
+    const scaleX = canvasRect.width / canvas.offsetWidth || 1;
+    const scaleY = canvasRect.height / canvas.offsetHeight || scaleX;
+    return {
+        element,
+        x: (rect.left - canvasRect.left + rect.width / 2) / scaleX,
+        y: (rect.top - canvasRect.top + rect.height / 2) / scaleY
+    };
 }
 
 function atom8PingNodeKey(node) {
@@ -6948,19 +7280,16 @@ function atom8FindPhysicalPath(canvas, fromNode, toNode) {
 
 function atom8SampleSvgPath(canvas, connection, startPoint, endPoint) {
     const path = connection.path;
-    const matrix = path.getScreenCTM();
-    const canvasRect = canvas.getBoundingClientRect();
     const length = path.getTotalLength();
-    if (!matrix || !Number.isFinite(length) || length <= 0) return [startPoint, endPoint];
+    if (!Number.isFinite(length) || length <= 0) return [startPoint, endPoint];
     const sampleCount = Math.max(16, Math.min(64, Math.ceil(length / 10)));
     const sampled = Array.from({ length: sampleCount + 1 }, (_, index) => {
         const ratio = index / sampleCount;
         const svgPoint = path.getPointAtLength(length * (connection.reverse ? 1 - ratio : ratio));
-        const point = path.ownerSVGElement.createSVGPoint();
-        point.x = svgPoint.x;
-        point.y = svgPoint.y;
-        const screenPoint = point.matrixTransform(matrix);
-        return { x: screenPoint.x - canvasRect.left, y: screenPoint.y - canvasRect.top };
+        // Every Atom 8 connection SVG uses the topology canvas coordinate
+        // system. Keep packet keyframes in that same unscaled system; the
+        // canvas transform then moves the cable and packet together.
+        return { x: svgPoint.x, y: svgPoint.y };
     });
     return [startPoint, ...sampled, endPoint];
 }
@@ -6978,19 +7307,36 @@ function atom8SetPingMessage(message, phase, outcome = null) {
     atom8PingState.message = message;
     atom8PingState.phase = phase;
     atom8PingState.outcome = outcome;
-    const status = document.querySelector('#atom8Container .atom8-connectivity-status');
+    const status = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-connectivity-status');
     if (status) {
         status.className = 'atom8-connectivity-status ' + (outcome || '');
         status.innerHTML = '<i class="fa-solid ' + (outcome === 'success' ? 'fa-circle-check' : outcome === 'failure' ? 'fa-circle-xmark' : 'fa-satellite-dish') + '" aria-hidden="true"></i><span>' + atom6Escape(message) + '</span>';
     }
-    if (atom8PingState.mode === 'official' && atom8PingState.caseId) {
-        const caseRow = document.querySelector('#atom8Container .atom8-official-case[data-case-id="' + atom8PingState.caseId + '"]');
-        const caseMessage = caseRow?.querySelector('.atom8-official-case-message');
-        if (caseMessage) caseMessage.textContent = message;
+    if (atom8PingState.caseId) {
+        const selector = atom8PingState.mode === 'official' ? '.atom8-official-case[data-case-id="' + atom8PingState.caseId + '"]' : '.atom8-self-case[data-pair-id="' + atom8PingState.caseId + '"]';
+        const caseRow = document.querySelector(atom8CurrentContainerSelector() + ' ' + selector);
+        if (caseRow) {
+            caseRow.dataset.phase = phase;
+            const route = caseRow.querySelector('.atom8-case-route');
+            const phaseText = phase === 'request' ? 'Request traveling from source to destination' :
+                phase === 'reply' ? 'Reply traveling from destination to source' :
+                outcome === 'success' ? 'Connection passed' : outcome === 'failure' ? 'Connection failed' : 'Connection not tested';
+            if (route) {
+                const endpointLabel = String(route.getAttribute('aria-label') || '').split('. ')[0];
+                route.setAttribute('aria-label', endpointLabel + '. ' + phaseText);
+                const phaseDescription = route.querySelector('.atom8-case-phase');
+                if (phaseDescription) phaseDescription.textContent = phaseText;
+            }
+            caseRow.querySelectorAll('.atom8-case-phase span').forEach(marker => {
+                const markerPhase = marker.dataset.phase;
+                marker.classList.toggle('active', markerPhase === phase || (phase === 'complete' && markerPhase === 'result'));
+                marker.classList.toggle('done', phase === 'reply' && markerPhase === 'request' || phase === 'complete' && markerPhase !== 'result');
+            });
+        }
     }
-    const topologyInstruction = document.querySelector('#atom8Container .atom8-topology .atom6-topology-heading > small');
+    const topologyInstruction = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-topology-instruction');
     if (topologyInstruction) {
-        topologyInstruction.textContent = outcome ? 'Test complete. Select Start over to choose another pair of PCs.' :
+        topologyInstruction.textContent = outcome ? 'Test complete. Select another source PC to create a new pair.' :
             (phase === 'request' || phase === 'reply' ? 'Visualizing the configured packet path.' : topologyInstruction.textContent);
     }
 }
@@ -7000,6 +7346,7 @@ function atom8CancelPingAnimation() {
     atom8PingAnimation?.cancel();
     atom8PingAnimation = null;
     atom8PingState.running = false;
+    atom8PingState.paused = false;
     document.querySelectorAll('.atom8-icmp-packet').forEach(packet => packet.remove());
     document.querySelectorAll('.atom8-icmp-active, .atom8-icmp-arrived, .atom8-icmp-failed').forEach(element => {
         element.classList.remove('atom8-icmp-active', 'atom8-icmp-arrived', 'atom8-icmp-failed');
@@ -7011,7 +7358,7 @@ function atom8PingDelay(ms, runId) {
 }
 
 async function atom8AnimatePacket(nodes, direction, runId, failAtEnd) {
-    const canvas = document.querySelector('#atom8Container .atom8-topology-canvas');
+    const canvas = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-topology-canvas');
     if (!canvas || runId !== atom8PingRunId) return false;
     const points = nodes.map(node => atom8PingPoint(canvas, node)).filter(Boolean);
     if (!points.length) return false;
@@ -7025,13 +7372,14 @@ async function atom8AnimatePacket(nodes, direction, runId, failAtEnd) {
     points[0].element.classList.add('atom8-icmp-active');
     for (let i = 1; i < points.length; i++) {
         if (runId !== atom8PingRunId) { packet.remove(); return false; }
-        const speed = Math.max(0.1, Number(exerciseData['atom8-main'].atom8State.connectivityTest.speed) || 1);
+        const speed = Math.max(0.1, Number(atom8CurrentExercise().atom8State.connectivityTest.speed) || 1);
         const duration = Math.max(120, Number(QUESTION_CONFIG.atom8.connectivityTest.hopDurationMs) / speed);
         points[i - 1].element.classList.remove('atom8-icmp-active');
         points[i].element.classList.add('atom8-icmp-active');
         const connection = atom8FindPhysicalPath(canvas, nodes[i - 1], nodes[i]);
         const segmentPoints = connection ? atom8SampleSvgPath(canvas, connection, points[i - 1], points[i]) : [points[i - 1], points[i]];
         atom8PingAnimation = packet.animate(atom8PacketKeyframes(segmentPoints, translate), { duration, easing: 'linear', fill: 'forwards' });
+        if (atom8PingState.paused) atom8PingAnimation.pause();
         try { await atom8PingAnimation.finished; }
         catch (err) {
             packet.remove();
@@ -7050,7 +7398,7 @@ async function atom8AnimatePacket(nodes, direction, runId, failAtEnd) {
 }
 
 async function atom8RunPingTest() {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     if (!ex || !atom8PingState.sourceId || !atom8PingState.destinationId || atom8PingState.running) return null;
     atom8CancelPingAnimation();
     const runId = atom8PingRunId;
@@ -7061,7 +7409,7 @@ async function atom8RunPingTest() {
     if (!requestMoved || runId !== atom8PingRunId) return null;
     if (!result.request.success) {
         atom8PingState.running = false;
-        atom8SetPingMessage(result.message, 'complete', 'failure');
+        atom8SetPingMessage('Failed', 'complete', 'failure');
         return false;
     }
     if (result.reply && !result.reply.success) {
@@ -7069,7 +7417,7 @@ async function atom8RunPingTest() {
         const replyMoved = await atom8AnimatePacket(result.reply.nodes, 'reply', runId, true);
         if (!replyMoved || runId !== atom8PingRunId) return null;
         atom8PingState.running = false;
-        atom8SetPingMessage(result.message, 'complete', 'failure');
+        atom8SetPingMessage('Failed', 'complete', 'failure');
         return false;
     }
     const turnaround = Number(QUESTION_CONFIG.atom8.connectivityTest.turnaroundDelayMs) || 0;
@@ -7078,7 +7426,7 @@ async function atom8RunPingTest() {
     const replyMoved = await atom8AnimatePacket(result.reply.nodes, 'reply', runId, false);
     if (!replyMoved || runId !== atom8PingRunId) return null;
     atom8PingState.running = false;
-    atom8SetPingMessage(result.message, 'complete', 'success');
+    atom8SetPingMessage('Passed', 'complete', 'success');
     return true;
 }
 
@@ -7092,7 +7440,7 @@ function atom8QuickReviewRow(label, value) {
 }
 
 function atom8QuickReviewContent(target) {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     if (!ex) return '';
     if (target.dataset.reviewKind === 'host') {
         const host = ex.model.hosts.find(item => item.id === target.dataset.reviewId);
@@ -7168,6 +7516,61 @@ function atom8OfficialEndpointLabel(ex, endpoint) {
     return host.label + ' · LAN ' + lan.number;
 }
 
+function atom8CaseEndpointData(ex, host, fallbackName, fallbackDetail) {
+    if (!host) return {
+        name: fallbackName || 'Unavailable',
+        detail: fallbackDetail || 'Endpoint unavailable'
+    };
+    const lan = ex.scenario.lans.find(item => item.id === host.lanId);
+    return {
+        name: host.label,
+        detail: lan ? 'LAN ' + lan.number + ' · ' + lan.label : 'LAN unavailable'
+    };
+}
+
+function atom8BuildCaseEndpointCard(role, endpoint, modifier = '') {
+    return '<div class="atom8-case-endpoint-card ' + role.toLowerCase() + (modifier ? ' ' + modifier : '') + '">' +
+        '<span><i class="fa-solid fa-desktop" aria-hidden="true"></i>' + role + '</span>' +
+        '<strong>' + atom6Escape(endpoint.name) + '</strong>' +
+        '<small>' + atom6Escape(endpoint.detail) + '</small></div>';
+}
+
+function atom8BuildCaseRoute(ex, source, destination, phase, status, options = {}) {
+    const sourceData = atom8CaseEndpointData(ex, source, options.sourceName, options.sourceDetail);
+    const destinationData = atom8CaseEndpointData(ex, destination, options.destinationName, options.destinationDetail);
+    const phaseLabel = phase === 'request' ? 'Request traveling from source to destination' :
+        phase === 'reply' ? 'Reply traveling from destination to source' :
+        status === 'green' ? 'Connection passed' : status === 'red' ? 'Connection failed' : 'Connection not tested';
+    return '<div class="atom8-case-route" role="img" aria-label="' + atom6Escape(sourceData.name + ' to ' + destinationData.name + '. ' + phaseLabel) + '">' +
+        atom8BuildCaseEndpointCard('SRC', sourceData, source ? '' : 'awaiting') +
+        '<div class="atom8-case-flow" aria-hidden="true"><span class="atom8-case-flow-track"></span><i class="atom8-case-flow-packet fa-solid fa-circle"></i><i class="atom8-case-flow-result fa-solid ' + (status === 'green' ? 'fa-check' : status === 'red' ? 'fa-xmark' : 'fa-arrow-right') + '"></i></div>' +
+        atom8BuildCaseEndpointCard('DST', destinationData, destination ? '' : 'awaiting') +
+        '<span class="atom8-case-phase">' + atom6Escape(phaseLabel) + '</span></div>';
+}
+
+function atom8BuildCasePlaybackControl(options) {
+    const { runClass, dataName, dataValue, label, running, completed, disabled } = options;
+    if (running) {
+        return '<span class="atom8-case-activity" role="status" aria-label="' + atom6Escape(label) + ' is running"><i class="fa-solid fa-wave-square" aria-hidden="true"></i></span>';
+    }
+    return '<button type="button" class="atom8-case-play ' + runClass + '" data-' + dataName + '="' + atom6Escape(dataValue) + '" aria-label="' + (completed ? 'Replay ' : 'Play ') + atom6Escape(label) + '" title="' + (completed ? 'Run again' : 'Play test') + '"' + (disabled ? ' disabled' : '') + '><i class="fa-solid ' + (completed ? 'fa-rotate-right' : 'fa-play') + '" aria-hidden="true"></i></button>';
+}
+
+function atom8BuildRunAllControl(runClass, running, busy, label) {
+    return '<button type="button" class="atom8-run-all-tests ' + runClass + '" aria-label="Run all ' + atom6Escape(label) + '"' + (busy ? ' disabled' : '') + '><i class="fa-solid fa-forward" aria-hidden="true"></i><span>' + (running ? 'Running all' : 'Run all') + '</span></button>';
+}
+
+function atom8BuildTransportBar(activeLabel, activeRunning = false) {
+    const hasActive = !!activeLabel;
+    const running = hasActive && (atom8PingState.running || activeRunning);
+    const paused = running && atom8PingState.paused;
+    const stateLabel = running ? (paused ? 'Paused' : 'Running') : (hasActive ? 'Ready' : 'No active test');
+    return '<div class="atom8-transport-bar" aria-label="Test playback controls"><div class="atom8-transport-current"><span class="' + (running ? 'active' : '') + '"><i class="fa-solid ' + (running ? 'fa-circle' : 'fa-minus') + '" aria-hidden="true"></i>' + stateLabel + '</span><strong>' + atom6Escape(activeLabel || 'Choose a case to begin') + '</strong></div>' +
+        '<div class="atom8-transport-controls"><button type="button" class="atom8-transport-button atom8-transport-primary ' + (running ? 'atom8-pause-active-test' : 'atom8-play-selected-test') + '" aria-label="' + (running ? (paused ? 'Resume active test' : 'Pause active test') : 'Play selected test') + '" title="' + (running ? (paused ? 'Resume' : 'Pause') : 'Play') + '"' + (!hasActive ? ' disabled' : '') + '><i class="fa-solid ' + (running ? (paused ? 'fa-play' : 'fa-pause') : 'fa-play') + '" aria-hidden="true"></i></button>' +
+        '<button type="button" class="atom8-transport-button atom8-stop-active-test" aria-label="Stop active test" title="Stop"' + (!running ? ' disabled' : '') + '><i class="fa-solid fa-stop" aria-hidden="true"></i></button>' +
+        '<button type="button" class="atom8-transport-button atom8-reset-active-test" aria-label="Reset active test" title="Restart from beginning"' + (!running ? ' disabled' : '') + '><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i></button></div></div>';
+}
+
 function atom8BuildOfficialTests(ex) {
     const suite = QUESTION_CONFIG.atom8.connectivityTest?.officialTestCases;
     const cases = atom8OfficialCases();
@@ -7176,31 +7579,45 @@ function atom8BuildOfficialTests(ex) {
     const busy = atom8OfficialRunAllActive || atom8PingState.running || Object.values(results).some(result => result.status === 'running');
     const rows = cases.map((testCase, index) => {
         const result = results[testCase.id] || { status: 'gray', message: 'Not tested' };
-        const dotStatus = result.status === 'running' ? 'blue' : result.status;
-        return '<article class="atom8-official-case ' + atom6Escape(result.status) + '" data-case-id="' + atom6Escape(testCase.id) + '">' +
-            '<div class="atom8-official-case-index">' + (index + 1) + '</div>' + atom8StatusDot(dotStatus) +
-            '<div class="atom8-official-case-copy"><div><strong>' + atom6Escape(testCase.label) + '</strong><span>' + Number(testCase.points) + ' pts</span></div>' +
-            '<p><span>' + atom6Escape(atom8OfficialEndpointLabel(ex, testCase.source)) + '</span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span>' + atom6Escape(atom8OfficialEndpointLabel(ex, testCase.destination)) + '</span></p>' +
-            '<small class="atom8-official-case-message">' + atom6Escape(result.message || 'Not tested') + '</small></div>' +
-            '<button type="button" class="atom8-run-official-case" data-case-id="' + atom6Escape(testCase.id) + '"' + (busy ? ' disabled' : '') + '><i class="fa-solid fa-play" aria-hidden="true"></i><span>Test</span></button></article>';
+        const isActive = atom8PingState.caseId === testCase.id;
+        const isRunning = isActive && result.status === 'running';
+        const phase = isActive ? atom8PingState.phase : (result.status === 'green' || result.status === 'red' ? 'complete' : 'idle');
+        const source = atom8ResolveOfficialEndpoint(ex, testCase.source);
+        const destination = atom8ResolveOfficialEndpoint(ex, testCase.destination);
+        return '<article class="atom8-test-case atom8-official-case ' + atom6Escape(result.status) + (isActive ? ' active' : '') + '" data-case-id="' + atom6Escape(testCase.id) + '" data-phase="' + phase + '">' +
+            '<div class="atom8-official-case-index">' + (index + 1) + '</div>' +
+            '<div class="atom8-official-case-copy"><div><strong title="' + atom6Escape(testCase.label) + '">' + atom6Escape(testCase.label) + '</strong><span>' + Number(testCase.points) + ' pts</span></div>' +
+            atom8BuildCaseRoute(ex, source, destination, phase, result.status) + '</div>' +
+            atom8BuildCasePlaybackControl({ runClass: 'atom8-run-official-case', dataName: 'case-id', dataValue: testCase.id, label: testCase.label, running: isRunning, completed: result.status === 'green' || result.status === 'red', disabled: busy }) + '</article>';
     }).join('');
-    return '<section class="atom8-official-tests" aria-label="Official scored connectivity tests"><div class="atom8-official-head"><div><span><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Official Assessment</span><h3>Scored Connectivity Test Cases</h3><p>Only these predetermined tests award points. Changing any saved network configuration clears every official result.</p></div>' +
-        (suite.runAllEnabled ? '<button type="button" class="atom8-run-all-tests"' + (busy ? ' disabled' : '') + '><i class="fa-solid fa-forward" aria-hidden="true"></i><span>' + (atom8OfficialRunAllActive ? 'Testing…' : 'Test All') + '</span></button>' : '') + '</div>' +
+    const activeTest = atom8PingState.mode === 'official' ? cases.find(testCase => testCase.id === atom8PingState.caseId) : null;
+    const activeResult = activeTest ? results[activeTest.id] : null;
+    const speed = Number(ex.atom8State.connectivityTest?.speed) || Number(QUESTION_CONFIG.atom8.connectivityTest.defaultSpeed) || 1;
+    return '<aside class="atom8-test-rail atom8-official-tests" aria-label="Official scored connectivity tests"><div class="atom8-official-head"><div><span><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Official Test</span><h3>Test Cases</h3><p>Run one case or the complete suite.</p></div>' +
+        (suite.runAllEnabled ? atom8BuildRunAllControl('atom8-run-all-official-tests', atom8OfficialRunAllActive, busy, 'official tests') : '') + '</div>' +
+        atom8BuildTransportBar(activeTest?.label || '', activeResult?.status === 'running') +
         '<div class="atom8-official-suite-message" role="status"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>' + atom6Escape(ex.atom8State.officialTests.message) + '</span></div>' +
-        '<div class="atom8-official-case-list">' + rows + '</div></section>';
+        '<div class="atom8-official-case-list">' + rows + '</div>' + atom8BuildSpeedControl(speed) + '</aside>';
+}
+
+function atom8BuildSpeedControl(speed) {
+    const cfg = QUESTION_CONFIG.atom8.connectivityTest;
+    return '<label class="atom8-speed-control"><span><small>Animation speed</small><output>' + Number(speed).toFixed(2).replace(/\.00$/, '') + '×</output></span><input type="range" class="atom8-ping-speed" min="' + Number(cfg.minSpeed) + '" max="' + Number(cfg.maxSpeed) + '" step="' + Number(cfg.speedStep) + '" value="' + Number(speed) + '"><span class="atom8-speed-scale"><small>Slower</small><small>Faster</small></span></label>';
 }
 
 async function atom8RunOfficialCase(caseId) {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     const testCase = atom8OfficialCases().find(item => item.id === caseId);
     if (!ex || !testCase || atom8PingState.running) return false;
+    const scoreBeforeRun = Number(ex.score || 0);
     const source = atom8ResolveOfficialEndpoint(ex, testCase.source);
     const destination = atom8ResolveOfficialEndpoint(ex, testCase.destination);
     const resultState = ex.atom8State.officialTests.results[testCase.id];
+    const previousResult = { status: resultState.status, message: resultState.message };
     if (!source || !destination || source.id === destination.id) {
         resultState.status = 'red';
-        resultState.message = 'The configured test endpoints are unavailable.';
-        ex.atom8State.officialTests.message = 'An official test case has invalid endpoint configuration.';
+        resultState.message = 'Failed';
+        ex.atom8State.officialTests.message = 'Test failed.';
         atom8ApplyOfficialScore(ex);
         ex.userAnswer = JSON.stringify(ex.atom8State);
         saveSessionProgress();
@@ -7208,6 +7625,7 @@ async function atom8RunOfficialCase(caseId) {
         updateSummaryPanel();
         return false;
     }
+    atom8WorkspaceMode = 'official';
     resultState.status = 'running';
     resultState.message = 'Preparing official ICMP test…';
     ex.atom8State.officialTests.message = 'Running ' + testCase.label + '…';
@@ -7218,34 +7636,50 @@ async function atom8RunOfficialCase(caseId) {
     atom8PingState.destinationId = destination.id;
     atom8PingState.phase = 'ready';
     atom8PingState.outcome = null;
+    atom8PingState.paused = false;
+    atom8PingState.stopRequested = false;
     atom8PingState.message = 'Preparing official ICMP test…';
     renderAtom8View();
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const passed = await atom8RunPingTest();
-    resultState.status = passed === true ? 'green' : 'red';
-    resultState.message = passed === true ? 'Passed · ICMP request and reply completed.' : (atom8PingState.message || 'Failed · No complete round trip.');
-    ex.atom8State.officialTests.message = passed === true ? testCase.label + ' passed.' : testCase.label + ' failed. Review the configuration and retest.';
+    const stopped = passed === null && atom8PingState.stopRequested;
+    resultState.status = stopped ? previousResult.status : passed === true ? 'green' : 'red';
+    resultState.message = stopped ? (previousResult.status === 'green' || previousResult.status === 'red' ? previousResult.message : 'Stopped · Ready to test again.') : passed === true ? 'Passed' : 'Failed';
+    ex.atom8State.officialTests.message = stopped ? testCase.label + ' stopped. Its previous result was retained.' : passed === true ? 'Test passed.' : 'Test failed.';
     atom8PingState.active = false;
     atom8PingState.mode = null;
     atom8PingState.caseId = null;
     atom8PingState.sourceId = null;
     atom8PingState.destinationId = null;
+    atom8PingState.paused = false;
+    atom8PingState.stopRequested = false;
     atom8ApplyOfficialScore(ex);
     ex.userAnswer = JSON.stringify(ex.atom8State);
     saveSessionProgress();
     renderAtom8View();
     updateSummaryPanel();
-    return passed === true;
+    atom8CelebratePerfectItem(ex, scoreBeforeRun);
+    const restart = stopped && atom8RestartRequest?.mode === 'official' && atom8RestartRequest.caseId === testCase.id;
+    if (restart) {
+        atom8RestartRequest = null;
+        setTimeout(() => atom8RunOfficialCase(testCase.id), 0);
+    }
+    return stopped ? null : passed === true;
 }
 
 async function atom8RunAllOfficialCases() {
     if (atom8OfficialRunAllActive || atom8PingState.running) return;
+    atom8WorkspaceMode = 'official';
     atom8OfficialRunAllActive = true;
-    const ex = exerciseData['atom8-main'];
-    for (const testCase of atom8OfficialCases()) await atom8RunOfficialCase(testCase.id);
+    const ex = atom8CurrentExercise();
+    let stopped = false;
+    for (const testCase of atom8OfficialCases()) {
+        const outcome = await atom8RunOfficialCase(testCase.id);
+        if (!atom8OfficialRunAllActive || outcome === null) { stopped = true; break; }
+    }
     atom8OfficialRunAllActive = false;
     const passed = atom8OfficialCases().filter(testCase => ex.atom8State.officialTests.results[testCase.id]?.status === 'green').length;
-    ex.atom8State.officialTests.message = 'Official suite complete: ' + passed + ' of ' + atom8OfficialCases().length + ' test cases passed.';
+    ex.atom8State.officialTests.message = stopped ? 'Official suite stopped. Completed results were retained.' : 'Official suite complete: ' + passed + ' of ' + atom8OfficialCases().length + ' test cases passed.';
     atom8ApplyOfficialScore(ex);
     ex.userAnswer = JSON.stringify(ex.atom8State);
     saveSessionProgress();
@@ -7256,22 +7690,92 @@ async function atom8RunAllOfficialCases() {
 function atom8BuildConnectivityTest(ex) {
     const cfg = QUESTION_CONFIG.atom8.connectivityTest;
     if (!cfg?.enabled) return '';
-    const hostSummary = hostId => {
-        const host = ex.model.hosts.find(item => item.id === hostId);
-        if (!host) return '<span>Not selected</span><small>Select a PC in the topology</small>';
-        const input = ex.atom8State.hosts[host.id];
-        return '<span>' + atom6Escape(host.label) + '</span><small>' + atom6Escape(input.ip || 'Not configured') + '</small>';
-    };
-    const speed = Number(ex.atom8State.connectivityTest?.speed) || Number(cfg.defaultSpeed) || 1;
-    const statusIcon = atom8PingState.outcome === 'success' ? 'fa-circle-check' : atom8PingState.outcome === 'failure' ? 'fa-circle-xmark' : 'fa-satellite-dish';
-    const manualActive = atom8PingState.active && atom8PingState.mode === 'manual';
-    return '<section class="atom8-connectivity-test atom8-self-test' + (manualActive ? ' active' : '') + '" aria-label="Unscored student connectivity test">' +
-        '<div class="atom8-connectivity-head"><div class="atom8-connectivity-title"><span><i class="fa-solid fa-flask" aria-hidden="true"></i> Student Self-Test · Unscored</span><h3>Manual Connectivity Check</h3><p>Choose any source and destination PC for practice. Self-tests never change the official score.</p></div>' +
-        '<button type="button" class="secondary-btn atom8-ping-toggle"><i class="fa-solid ' + (manualActive ? 'fa-xmark' : 'fa-play') + '" aria-hidden="true"></i> ' + (manualActive ? 'Close Self-Test' : 'Start Self-Test') + '</button></div>' +
-        (manualActive ? '<div class="atom8-connectivity-controls"><div class="atom8-endpoint-flow"><div class="atom8-endpoint-card' + (atom8PingState.sourceId ? ' selected' : ' awaiting') + '"><b>1</b><div><small>Source PC</small>' + hostSummary(atom8PingState.sourceId) + '</div></div><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><div class="atom8-endpoint-card' + (atom8PingState.destinationId ? ' selected' : ' awaiting') + '"><b>2</b><div><small>Destination PC</small>' + hostSummary(atom8PingState.destinationId) + '</div></div></div>' +
-            '<label class="atom8-speed-control"><span><small>Animation speed</small><output>' + speed.toFixed(2).replace(/\.00$/, '') + '×</output></span><input type="range" class="atom8-ping-speed" min="' + Number(cfg.minSpeed) + '" max="' + Number(cfg.maxSpeed) + '" step="' + Number(cfg.speedStep) + '" value="' + speed + '"><span class="atom8-speed-scale"><small>Slower</small><small>Faster</small></span></label>' +
-            '<button type="button" class="atom8-ping-reset"' + (atom8PingState.running ? ' disabled' : '') + '><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Start over</span></button></div>' +
-            '<div class="atom8-connectivity-status ' + (atom8PingState.outcome || '') + '" role="status" aria-live="polite"><i class="fa-solid ' + statusIcon + '" aria-hidden="true"></i><span>' + atom6Escape(atom8PingState.message) + '</span></div>' : '') + '</section>';
+    const connectivity = ex.atom8State.connectivityTest;
+    const speed = Number(connectivity.speed) || Number(cfg.defaultSpeed) || 1;
+    const pairs = Array.isArray(connectivity.pairs) ? connectivity.pairs : [];
+    const busy = atom8PingState.running || atom8SelfRunAllActive || pairs.some(pair => pair.status === 'running');
+    const rows = pairs.map((pair, index) => {
+        const isActive = atom8PingState.mode === 'manual' && atom8PingState.caseId === pair.id;
+        const isRunning = isActive && pair.status === 'running';
+        const phase = isActive ? atom8PingState.phase : (pair.status === 'green' || pair.status === 'red' ? 'complete' : 'idle');
+        const source = ex.model.hosts.find(host => host.id === pair.sourceId);
+        const destination = ex.model.hosts.find(host => host.id === pair.destinationId);
+        return '<article class="atom8-test-case atom8-official-case atom8-self-case ' + atom6Escape(pair.status || 'gray') + (isActive ? ' active' : '') + '" data-pair-id="' + atom6Escape(pair.id) + '" data-phase="' + phase + '">' +
+            '<div class="atom8-official-case-index">' + (index + 1) + '</div>' +
+            '<div class="atom8-official-case-copy"><div><strong>Manual Pair ' + (index + 1) + '</strong><span>Unscored</span></div>' + atom8BuildCaseRoute(ex, source, destination, phase, pair.status || 'gray') + '</div>' +
+            atom8BuildCasePlaybackControl({ runClass: 'atom8-run-self-pair', dataName: 'pair-id', dataValue: pair.id, label: 'manual pair ' + (index + 1), running: isRunning, completed: pair.status === 'green' || pair.status === 'red', disabled: busy }) + '</article>';
+    }).join('');
+    const selectedPair = pairs.find(pair => pair.id === atom8PingState.caseId);
+    const draftSource = atom8PingState.sourceId && !atom8PingState.destinationId ? ex.model.hosts.find(host => host.id === atom8PingState.sourceId) : null;
+    const draftRow = '<article class="atom8-test-case atom8-official-case atom8-self-case atom8-draft-case" data-phase="idle"><div class="atom8-official-case-index">' + (pairs.length + 1) + '</div><div class="atom8-official-case-copy"><div><strong>New Test Pair</strong><span>Not saved</span></div>' + atom8BuildCaseRoute(ex, draftSource, null, 'idle', 'gray', {
+        sourceName: 'Select source PC', sourceDetail: 'First topology selection',
+        destinationName: draftSource ? 'Select destination PC' : 'Waiting for source', destinationDetail: 'Second topology selection'
+    }) + '</div><span class="atom8-case-draft-icon" aria-hidden="true"><i class="fa-solid fa-plus"></i></span></article>';
+    const activePairIndex = atom8PingState.mode === 'manual' ? pairs.findIndex(pair => pair.id === atom8PingState.caseId) : -1;
+    const activePair = activePairIndex >= 0 ? pairs[activePairIndex] : null;
+    const runAll = cfg.selfTestRunAllEnabled && pairs.length > 1 ? atom8BuildRunAllControl('atom8-run-all-self-tests', atom8SelfRunAllActive, busy, 'self-tests') : '';
+    return '<aside class="atom8-test-rail atom8-official-tests atom8-self-test active" aria-label="Unscored student connectivity tests"><div class="atom8-official-head"><div><span><i class="fa-solid fa-flask" aria-hidden="true"></i> Self-Test · Unscored</span><h3>Test Pairs</h3><p>Select two PCs to create each pair.</p></div><div class="atom8-self-head-actions"><label class="atom8-auto-send"><input type="checkbox" class="atom8-auto-send-input"' + (connectivity.autoSend ? ' checked' : '') + (busy ? ' disabled' : '') + '><span>Auto Send</span></label>' + runAll + '</div></div>' +
+        atom8BuildTransportBar(activePair ? 'Manual Pair ' + (activePairIndex + 1) : '', activePair?.status === 'running') +
+        '<div class="atom8-official-suite-message" role="status"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>' + atom6Escape(atom8PingState.message) + '</span></div><div class="atom8-official-case-list atom8-self-case-list">' + rows + draftRow + '</div>' +
+        '<div class="atom8-self-actions"><button type="button" class="atom8-self-run"' + (!selectedPair || busy ? ' disabled' : '') + '><i class="fa-solid fa-paper-plane" aria-hidden="true"></i><span>' + (busy ? 'Testing…' : 'Run Self-Test') + '</span></button><button type="button" class="atom8-clear-self-pairs"' + (!pairs.length || busy ? ' disabled' : '') + '><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>Clear</span></button></div>' + atom8BuildSpeedControl(speed) + '</aside>';
+}
+
+async function atom8RunSelfPair(pairId) {
+    const ex = atom8CurrentExercise();
+    const pair = ex?.atom8State.connectivityTest?.pairs?.find(item => item.id === pairId);
+    if (!ex || !pair || atom8PingState.running) return false;
+    const previousResult = { status: pair.status, message: pair.message };
+    pair.status = 'running';
+    pair.message = 'Preparing ICMP test…';
+    atom8PingState.active = true;
+    atom8PingState.mode = 'manual';
+    atom8PingState.caseId = pair.id;
+    atom8PingState.sourceId = pair.sourceId;
+    atom8PingState.destinationId = pair.destinationId;
+    atom8PingState.phase = 'ready';
+    atom8PingState.outcome = null;
+    atom8PingState.paused = false;
+    atom8PingState.stopRequested = false;
+    atom8PingState.message = pair.message;
+    renderAtom8View();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const passed = await atom8RunPingTest();
+    const stopped = passed === null && atom8PingState.stopRequested;
+    pair.status = stopped ? previousResult.status : passed === true ? 'green' : 'red';
+    pair.message = stopped ? (previousResult.status === 'green' || previousResult.status === 'red' ? previousResult.message : 'Stopped · Ready to test again.') : passed === true ? 'Passed' : 'Failed';
+    if (stopped) atom8PingState.message = 'Self-test stopped. Its previous result was retained.';
+    atom8PingState.paused = false;
+    atom8PingState.stopRequested = false;
+    ex.userAnswer = JSON.stringify(ex.atom8State);
+    saveSessionProgress();
+    renderAtom8View();
+    const restart = stopped && atom8RestartRequest?.mode === 'manual' && atom8RestartRequest.caseId === pair.id;
+    if (restart) {
+        atom8RestartRequest = null;
+        setTimeout(() => atom8RunSelfPair(pair.id), 0);
+    }
+    return stopped ? null : passed === true;
+}
+
+async function atom8RunAllSelfPairs() {
+    const ex = atom8CurrentExercise();
+    const pairs = ex?.atom8State.connectivityTest?.pairs || [];
+    if (!ex || pairs.length < 2 || atom8PingState.running || atom8SelfRunAllActive) return;
+    atom8WorkspaceMode = 'self-test';
+    atom8SelfRunAllActive = true;
+    const pairIds = pairs.map(pair => pair.id);
+    renderAtom8View();
+    let stopped = false;
+    for (const pairId of pairIds) {
+        const outcome = await atom8RunSelfPair(pairId);
+        if (!atom8SelfRunAllActive || outcome === null) { stopped = true; break; }
+    }
+    atom8SelfRunAllActive = false;
+    const passed = pairs.filter(pair => pair.status === 'green').length;
+    atom8PingState.message = stopped ? 'Self-test suite stopped. Completed results were retained.' : 'Self-test suite complete: ' + passed + ' of ' + pairs.length + ' pairs passed.';
+    ex.userAnswer = JSON.stringify(ex.atom8State);
+    saveSessionProgress();
+    renderAtom8View();
 }
 
 function atom8BuildTopology(ex) {
@@ -7285,6 +7789,13 @@ function atom8BuildTopology(ex) {
     const routerTop = 0;
     const baseY = 36;
     const overlayHeight = 110;
+    const viewConfig = QUESTION_CONFIG.atom8.topologyView || {};
+    const minZoom = Number(viewConfig.minZoom) || 0.65;
+    const maxZoom = Number(viewConfig.maxZoom) || 1.4;
+    atom8TopologyZoom = Math.min(maxZoom, Math.max(minZoom, atom8TopologyZoom));
+    const canvasHeight = Number(viewConfig.canvasHeight) || 500;
+    const scaledWidth = Math.ceil(canvasWidth * atom8TopologyZoom);
+    const scaledHeight = Math.ceil(canvasHeight * atom8TopologyZoom);
     const wanPaths = scenario.wans.map(wan => {
         const fromIndex = model.routers.findIndex(router => router.id === wan.fromRouterId);
         const toIndex = model.routers.findIndex(router => router.id === wan.toRouterId);
@@ -7321,43 +7832,111 @@ function atom8BuildTopology(ex) {
     }).join('');
     const topologyInstruction = atom8PingState.active ?
         (atom8PingState.mode === 'official' ? (atom8PingState.running ? 'Visualizing an official scored test case.' : 'Preparing the official test path.') :
-            (atom8PingState.outcome ? 'Self-test complete. Select Start over to choose another pair of PCs.' : atom8PingState.running ? 'Visualizing the self-test packet path.' : atom8PingState.sourceId ? 'Select the destination PC.' : 'Select the source PC.')) :
-        'Select a router or host to configure it. Switches require no configuration.';
-    return '<section class="atom6-topology atom8-topology' + (atom8PingState.active ? ' atom8-ping-mode' : '') + '" aria-label="Interactive network topology"><div class="atom6-topology-heading"><div><span>Interactive Deployment</span><h3>Network Topology</h3></div><small>' + topologyInstruction + '</small></div>' +
-        '<div class="atom6-topology-scroll"><div class="atom6-topology-canvas atom8-topology-canvas" style="width:' + canvasWidth + 'px"><svg class="atom6-wan-overlay" style="height:' + overlayHeight + 'px" viewBox="0 0 ' + canvasWidth + ' ' + overlayHeight + '" preserveAspectRatio="none" aria-label="Serial WAN connections">' + wanPaths + '</svg>' +
-        '<div class="atom6-topology-router-row atom8-topology-router-row" style="padding-top:' + routerTop + 'px">' + routerSites + '</div></div></div></section>';
+            (atom8PingState.outcome ? 'Self-test complete. Select another source PC to create a new pair.' : atom8PingState.running ? 'Visualizing the self-test packet path.' : atom8PingState.sourceId ? 'Select the destination PC.' : 'Select the source PC.')) :
+        (atom8WorkspaceMode === 'official' ? 'Official test cases run from the companion list.' : atom8WorkspaceMode === 'self-test' ? 'Select the source PC, then the destination PC.' : 'Select a router or host to configure it. Switches require no configuration.');
+    const zoomPercent = Math.round(atom8TopologyZoom * 100);
+    return '<section class="atom6-topology atom8-topology' + (atom8PingState.active ? ' atom8-ping-mode' : '') + '" aria-label="Interactive network topology"><div class="atom6-topology-heading"><div><span>Interactive Deployment</span><h3>Network Topology</h3></div>' +
+        '<div class="atom8-topology-heading-tools"><small class="atom8-topology-instruction">' + topologyInstruction + '</small><div class="atom8-zoom-controls" aria-label="Topology zoom controls">' +
+        '<button type="button" class="atom8-zoom-out" aria-label="Zoom out"><i class="fa-solid fa-minus" aria-hidden="true"></i></button><input class="atom8-zoom-slider" type="range" min="' + minZoom + '" max="' + maxZoom + '" step="' + (Number(viewConfig.zoomStep) || 0.05) + '" value="' + atom8TopologyZoom + '" aria-label="Topology zoom"><output>' + zoomPercent + '%</output><button type="button" class="atom8-zoom-in" aria-label="Zoom in"><i class="fa-solid fa-plus" aria-hidden="true"></i></button><button type="button" class="atom8-zoom-reset" aria-label="Reset topology view" title="Reset view"><i class="fa-solid fa-arrows-to-dot" aria-hidden="true"></i></button></div></div></div>' +
+        '<div class="atom6-topology-scroll atom8-topology-viewport" aria-label="Topology canvas. Drag to pan."><div class="atom8-topology-zoom-plane" data-base-width="' + canvasWidth + '" data-base-height="' + canvasHeight + '" style="width:' + scaledWidth + 'px;height:' + scaledHeight + 'px"><div class="atom6-topology-canvas atom8-topology-canvas" style="width:' + canvasWidth + 'px;transform:scale(' + atom8TopologyZoom + ')"><svg class="atom6-wan-overlay" style="height:' + overlayHeight + 'px" viewBox="0 0 ' + canvasWidth + ' ' + overlayHeight + '" preserveAspectRatio="none" aria-label="Serial WAN connections">' + wanPaths + '</svg>' +
+        '<div class="atom6-topology-router-row atom8-topology-router-row" style="padding-top:' + routerTop + 'px">' + routerSites + '</div></div></div></div></section>';
 }
 
 function atom8BuildPanel(ex) {
     const scenario = ex.scenario;
     const score = ex.score + '/' + ex.answers.length;
+    const isAtom9 = ex.type === 'atom9';
+    const atom9Position = isAtom9 ? Math.max(0, atom9QuestionIds.indexOf(activeDeploymentExerciseKey)) : -1;
+    const panelIndex = isAtom9 ? 'I' + (atom9Position + 1) : 'A8';
+    const panelTitle = isAtom9 ? ex.label : 'Apply Your VLSM Design';
     const answerKeyButton = QUESTION_CONFIG.atom8.answerKey?.showPopulateButton ?
-        '<button type="button" class="atom8-populate-key" title="Replace current Atom 8 configurations with the generated answer key"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Populate Answer Key</span></button>' : '';
-    const lanCards = scenario.lans.map(lan => '<article class="atom6-requirement-card atom6-lan-card"><div class="atom6-requirement-type">LAN ' + lan.number + '</div><div class="atom6-requirement-name">' + atom6Escape(lan.label) + '</div><strong>' + lan.hosts + ' hosts</strong></article>');
-    const wanCards = scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Point-to-Point</div><strong>' + wan.requiredIp + ' usable IP' + (wan.requiredIp === 1 ? '' : 's') + '</strong></article>');
-    return '<section class="panel atom8-panel"><div class="panel-head"><span class="panel-index">A8</span><div><h2>Apply Your VLSM Design</h2><p>Validation dots provide configuration feedback. Only official test cases determine the score.</p></div>' + answerKeyButton + '<span class="badge atom1-score-badge" id="atom8ScoreBadge">' + score + '</span></div>' +
-        '<div class="atom6-parent-network"><span><small>Primary allocation source</small>Parent Network</span><strong>' + scenario.parent.network + '/' + scenario.parent.cidr + '</strong></div>' +
-        atom8BuildOfficialTests(ex) + atom8BuildConnectivityTest(ex) + atom8BuildTopology(ex) + '<div class="atom6-requirements-heading"><span>Seeded Requirement</span><h3>LAN and WAN Requirements</h3></div><div class="atom6-requirement-grid">' + lanCards.concat(wanCards).join('') + '</div></section>';
+        '<button type="button" class="atom8-populate-key" title="Replace the current item configuration with its generated answer key"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Populate Answer Key</span></button>' : '';
+    const resetItemButton = isAtom9 ?
+        '<button type="button" class="atom9-reset-item" title="Clear all saved configuration and test results for this item"' + (isRetryAllowed() ? '' : ' disabled') + '><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Reset Item</span></button>' : '';
+    const panelActions = resetItemButton || answerKeyButton ? '<div class="atom8-panel-actions">' + resetItemButton + answerKeyButton + '</div>' : '';
+    const busy = atom8PingState.running || atom8OfficialRunAllActive || atom8SelfRunAllActive || Object.values(ex.atom8State.officialTests?.results || {}).some(result => result.status === 'running');
+    const modeButton = (mode, icon, label) => '<button type="button" class="atom8-mode-tab' + (atom8WorkspaceMode === mode ? ' active' : '') + '" data-mode="' + mode + '" aria-pressed="' + (atom8WorkspaceMode === mode) + '"' + (busy ? ' disabled' : '') + '><i class="fa-solid ' + icon + '" aria-hidden="true"></i><span>' + label + '</span></button>';
+    const requirements = atom8BuildRequirementsModal(ex);
+    const rail = atom8WorkspaceMode === 'official' ? atom8BuildOfficialTests(ex) : atom8WorkspaceMode === 'self-test' ? atom8BuildConnectivityTest(ex) : '';
+    const resetConfirmation = isAtom9 ? '<div class="atom9-reset-confirm-modal" hidden><button type="button" class="atom9-reset-cancel atom9-reset-backdrop" aria-label="Cancel item reset"></button><section class="atom9-reset-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="atom9ResetTitle"><div class="atom9-reset-confirm-icon"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></div><div><span>Reset current item</span><h3 id="atom9ResetTitle">Clear all configuration for ' + atom6Escape(panelTitle) + '?</h3><p>The seeded network and requirements will stay the same. Device settings, self-test pairs, official results, and this item’s score will be cleared.</p></div><footer><button type="button" class="secondary-btn atom9-reset-cancel">Cancel</button><button type="button" class="atom9-reset-confirm"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset Item</button></footer></section></div>' : '';
+    return '<section class="panel atom8-panel"><div class="panel-head"><span class="panel-index">' + panelIndex + '</span><div><h2>' + atom6Escape(panelTitle) + '</h2><p>Validation dots provide configuration feedback. Only official test cases determine the score.</p></div>' + panelActions + '<span class="badge atom1-score-badge" id="atom8ScoreBadge">' + score + '</span></div>' +
+        '<div class="atom8-context-bar"><div class="atom8-parent-context"><span><small>Primary allocation source</small>Parent Network</span><strong>' + scenario.parent.network + '/' + scenario.parent.cidr + '</strong></div><button type="button" class="atom8-requirements-open"><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>View Requirements</span></button><div class="atom8-score-context"><small>Score</small><strong>' + score + '</strong></div></div>' +
+        '<nav class="atom8-mode-tabs" aria-label="Deployment workflow modes">' + modeButton('configure', 'fa-sliders', 'Configure') + modeButton('self-test', 'fa-flask', 'Self-Test') + modeButton('official', 'fa-clipboard-check', 'Official Test') + '</nav>' +
+        '<div class="atom8-mode-workspace ' + atom8WorkspaceMode + '"><div class="atom8-topology-stage">' + atom8BuildTopology(ex) + '</div>' + rail + '</div>' + requirements + resetConfirmation + '</section>';
+}
+
+function atom8BuildRequirementsModal(ex) {
+    const lanCards = ex.scenario.lans.map(lan => '<article class="atom6-requirement-card atom6-lan-card"><div class="atom6-requirement-type">LAN ' + lan.number + '</div><div class="atom6-requirement-name">' + atom6Escape(lan.label) + '</div><strong>' + lan.hosts + ' hosts</strong></article>');
+    const wanCards = ex.scenario.wans.map(wan => '<article class="atom6-requirement-card atom6-wan-card"><div class="atom6-requirement-type">WAN ' + wan.number + '</div><div class="atom6-requirement-name">Point-to-Point</div><strong>' + wan.requiredIp + ' usable IP' + (wan.requiredIp === 1 ? '' : 's') + '</strong></article>');
+    return '<div class="atom8-requirements-modal" hidden><button type="button" class="atom8-requirements-backdrop" aria-label="Close requirements"></button><section class="atom8-requirements-dialog" role="dialog" aria-modal="true" aria-labelledby="atom8RequirementsTitle"><header><div><span>Seeded Scenario</span><h3 id="atom8RequirementsTitle">LAN and WAN Requirements</h3><p>Use this clean list while planning your VLSM allocation.</p></div><button type="button" class="atom8-requirements-close" aria-label="Close requirements"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div class="atom6-parent-network"><span><small>Primary allocation source</small>Parent Network</span><strong>' + ex.scenario.parent.network + '/' + ex.scenario.parent.cidr + '</strong></div><div class="atom6-requirement-grid">' + lanCards.concat(wanCards).join('') + '</div></section></div>';
+}
+
+function atom8SetWorkspaceMode(mode) {
+    if (!['configure', 'self-test', 'official'].includes(mode) || atom8PingState.running || atom8OfficialRunAllActive || atom8SelfRunAllActive) return;
+    atom8CancelPingAnimation();
+    atom8WorkspaceMode = mode;
+    atom8PingState.active = mode === 'self-test';
+    atom8PingState.mode = mode === 'self-test' ? 'manual' : null;
+    atom8PingState.caseId = null;
+    atom8PingState.sourceId = null;
+    atom8PingState.destinationId = null;
+    atom8PingState.phase = mode === 'self-test' ? 'select-source' : 'idle';
+    atom8PingState.outcome = null;
+    atom8PingState.message = mode === 'self-test' ? 'Select the source PC in the topology.' : 'Select a test to begin.';
+    renderAtom8View();
 }
 
 function renderAtom8View() {
-    const nav = document.getElementById('nav-atom8');
-    const container = document.getElementById('atom8Container');
-    const ex = exerciseData['atom8-main'];
-    const enabled = !!(QUESTION_CONFIG.atom8?.enabled && ex && atom8Model);
+    const isAtom9 = activeDeploymentExerciseKey.startsWith('atom9-');
+    const nav = document.getElementById(isAtom9 ? 'nav-atom9' : 'nav-atom8');
+    const container = atom8CurrentContainer();
+    const ex = atom8CurrentExercise();
+    const enabled = !!((isAtom9 ? QUESTION_CONFIG.atom9?.enabled : QUESTION_CONFIG.atom8?.enabled) && ex && ex.model);
     if (nav) nav.style.display = enabled ? '' : 'none';
     if (!container) return;
     if (!enabled) { container.innerHTML = ''; return; }
+    const previousList = container.querySelector('.atom8-official-case-list');
+    if (previousList && atom8ListScrollByMode[atom8RenderedWorkspaceMode] !== undefined) {
+        atom8ListScrollByMode[atom8RenderedWorkspaceMode] = previousList.scrollTop;
+    }
+    const previousViewport = container.querySelector('.atom8-topology-viewport');
+    if (previousViewport && atom8TopologyPanByMode[atom8RenderedWorkspaceMode]) {
+        atom8TopologyPanByMode[atom8RenderedWorkspaceMode] = { x: previousViewport.scrollLeft, y: previousViewport.scrollTop };
+    }
     ex.atom8State = ex.atom8State || atom8RestoreState(ex);
     atom8Validate(ex);
     atom8HideQuickReview();
     container.innerHTML = atom8BuildPanel(ex);
+    atom8RenderedWorkspaceMode = atom8WorkspaceMode;
+    const restoredList = container.querySelector('.atom8-official-case-list');
+    if (restoredList && atom8ListScrollByMode[atom8WorkspaceMode] !== undefined) {
+        const savedScrollTop = atom8ListScrollByMode[atom8WorkspaceMode];
+        restoredList.scrollTop = savedScrollTop;
+        requestAnimationFrame(() => {
+            if (restoredList.isConnected) restoredList.scrollTop = savedScrollTop;
+        });
+    }
+    const restoredViewport = container.querySelector('.atom8-topology-viewport');
+    if (restoredViewport && atom8TopologyPanByMode[atom8WorkspaceMode]) {
+        const savedPan = atom8TopologyPanByMode[atom8WorkspaceMode];
+        restoredViewport.scrollLeft = savedPan.x;
+        restoredViewport.scrollTop = savedPan.y;
+        requestAnimationFrame(() => {
+            if (!restoredViewport.isConnected) return;
+            restoredViewport.scrollLeft = savedPan.x;
+            restoredViewport.scrollTop = savedPan.y;
+        });
+    }
     atom8ScheduleTopologyConnections();
     updateAtom8NavScore();
-    if (!atom8HandlersAttached) {
-        atom8HandlersAttached = true;
+    if (!container.dataset.atom8HandlersAttached) {
+        container.dataset.atom8HandlersAttached = 'true';
         container.addEventListener('click', atom8HandleDeviceClick);
         container.addEventListener('input', atom8HandleConnectivityInput);
+        container.addEventListener('pointerdown', atom8HandleTopologyPanStart);
+        container.addEventListener('pointermove', atom8HandleTopologyPanMove);
+        container.addEventListener('pointerup', atom8HandleTopologyPanEnd);
+        container.addEventListener('pointercancel', atom8HandleTopologyPanEnd);
         container.addEventListener('mouseover', atom8HandleQuickReview);
         container.addEventListener('mousemove', atom8HandleQuickReview);
         container.addEventListener('mouseout', atom8HandleQuickReview);
@@ -7365,6 +7944,9 @@ function renderAtom8View() {
         container.addEventListener('pointermove', atom8HandleQuickReview);
         container.addEventListener('pointerout', atom8HandleQuickReview);
         container.addEventListener('scroll', atom8HideQuickReview, true);
+    }
+    if (!atom8HandlersAttached) {
+        atom8HandlersAttached = true;
         document.addEventListener('click', atom8HandleModalClick);
     }
     if (!atom8ConnectionResizeBound) {
@@ -7384,14 +7966,21 @@ function atom8ScheduleTopologyConnections() {
 }
 
 function atom8DrawTopologyConnections() {
-    const ex = exerciseData['atom8-main'];
-    const canvas = document.querySelector('#atom8Container .atom8-topology-canvas');
+    const ex = atom8CurrentExercise();
+    const canvas = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-topology-canvas');
     if (!ex || !canvas || canvas.offsetWidth === 0) return;
     canvas.querySelector('.atom8-physical-links')?.remove();
     canvas.querySelectorAll('.atom8-port-review-hotspot').forEach(hotspot => hotspot.remove());
     const canvasRect = canvas.getBoundingClientRect();
     const width = canvas.offsetWidth;
     const height = Math.max(canvas.scrollHeight, canvas.offsetHeight);
+    // The canvas itself is transformed for zooming. DOM rectangles are
+    // reported in scaled viewport pixels, while SVG path coordinates remain
+    // in the canvas's original coordinate system. Convert every measured
+    // point back to that unscaled system so links scale exactly once with the
+    // devices instead of drifting apart as zoom changes.
+    const scaleX = canvasRect.width / width || 1;
+    const scaleY = canvasRect.height / canvas.offsetHeight || scaleX;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'atom8-physical-links');
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
@@ -7399,8 +7988,8 @@ function atom8DrawTopologyConnections() {
     const point = (element, edge, offsetX = 0) => {
         const rect = element.getBoundingClientRect();
         return {
-            x: rect.left - canvasRect.left + rect.width / 2 + offsetX,
-            y: (edge === 'top' ? rect.top : rect.bottom) - canvasRect.top
+            x: (rect.left - canvasRect.left + rect.width / 2) / scaleX + offsetX,
+            y: ((edge === 'top' ? rect.top : rect.bottom) - canvasRect.top) / scaleY
         };
     };
     const addPath = (start, end, className, nodeA, nodeB) => {
@@ -7422,12 +8011,26 @@ function atom8DrawTopologyConnections() {
             }
         };
     };
-    const addPortLabel = (position, router, port, side, placement = 'above') => {
+    const addPortLabel = (position, router, port, side, placement = 'above', targetSvg = svg) => {
         if (!port) return;
         const status = ex.atom8State.validation.ports[router.id + ':' + port.id] || 'gray';
+        const portInput = ex.atom8State.routers[router.id]?.ports[port.id];
+        const hasDceClock = port.dce && String(portInput?.clockRate || '').trim() !== '';
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('class', 'atom8-link-port-label');
-        group.setAttribute('aria-label', port.name + ': ' + status);
+        group.setAttribute('aria-label', port.name + ': ' + status + (hasDceClock ? ', DCE clock rate set' : ''));
+        if (hasDceClock) {
+            const clock = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            clock.setAttribute('class', 'atom8-dce-clock-icon');
+            clock.setAttribute('x', position.x);
+            clock.setAttribute('y', position.y - 8);
+            clock.setAttribute('text-anchor', 'middle');
+            clock.textContent = '\uf017';
+            const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            title.textContent = 'DCE clock rate set';
+            clock.appendChild(title);
+            group.appendChild(clock);
+        }
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('class', 'atom8-link-port-dot ' + status);
         dot.dataset.reviewKind = 'port';
@@ -7443,7 +8046,7 @@ function atom8DrawTopologyConnections() {
         label.setAttribute('text-anchor', placeLeft ? 'end' : 'start');
         label.textContent = port.shortName || port.name;
         group.append(dot, label);
-        svg.appendChild(group);
+        targetSvg.appendChild(group);
         const hotspot = document.createElement('span');
         hotspot.className = 'atom8-port-review-hotspot';
         hotspot.dataset.reviewKind = 'port';
@@ -7482,21 +8085,25 @@ function atom8DrawTopologyConnections() {
         const fromRect = fromElement.getBoundingClientRect();
         const toRect = toElement.getBoundingClientRect();
         const leftToRight = fromRect.left < toRect.left;
-        const fromPosition = {
-            x: (leftToRight ? fromRect.right : fromRect.left) - canvasRect.left + (leftToRight ? 13 : -13),
-            y: fromRect.top - canvasRect.top + fromRect.height / 2
-        };
-        const toPosition = {
-            x: (leftToRight ? toRect.left : toRect.right) - canvasRect.left + (leftToRight ? -13 : 13),
-            y: toRect.top - canvasRect.top + toRect.height / 2
-        };
-        addPortLabel(fromPosition, fromRouter, fromRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'right' : 'left', 'below');
-        addPortLabel(toPosition, toRouter, toRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'left' : 'right', 'below');
+        const serialPath = [...canvas.querySelectorAll('.atom6-wan-svg-path')].find(path =>
+            path.dataset.nodeA === 'router:' + wan.fromRouterId && path.dataset.nodeB === 'router:' + wan.toRouterId
+        );
+        if (!serialPath) return;
+        const pathLength = serialPath.getTotalLength();
+        const interfaceOffset = Math.min(13, pathLength / 4);
+        const fromPosition = serialPath.getPointAtLength(interfaceOffset);
+        const toPosition = serialPath.getPointAtLength(pathLength - interfaceOffset);
+        // Serial markers live in the same SVG as the serial cable. This keeps
+        // each status dot centered on — and painted above — its actual path.
+        const serialOverlay = serialPath.parentNode;
+        addPortLabel(fromPosition, fromRouter, fromRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'right' : 'left', 'below', serialOverlay);
+        addPortLabel(toPosition, toRouter, toRouter.ports.find(port => port.role === 'wan' && port.targetId === wan.id), leftToRight ? 'left' : 'right', 'below', serialOverlay);
     });
     canvas.prepend(svg);
 }
 
 function syncAtom8ViewDOM() {
+    activeDeploymentExerciseKey = 'atom8-main';
     const ex = exerciseData['atom8-main'];
     if (!ex) return;
     ex.atom8State = atom8RestoreState(ex);
@@ -7506,9 +8113,23 @@ function syncAtom8ViewDOM() {
 }
 
 function updateAtom8NavScore() {
-    const ex = exerciseData['atom8-main'];
-    const score = document.getElementById('score-atom8');
-    if (score && ex) score.textContent = ex.score + '/' + ex.answers.length;
+    const atom8Ex = exerciseData['atom8-main'];
+    const atom8Score = document.getElementById('score-atom8');
+    if (atom8Score && atom8Ex) atom8Score.textContent = atom8Ex.score + '/' + atom8Ex.answers.length;
+    let atom9Got = 0;
+    let atom9Total = 0;
+    atom9QuestionIds.forEach(qid => {
+        const ex = exerciseData[qid];
+        if (!ex) return;
+        atom9Got += Number(ex.score || 0);
+        atom9Total += ex.answers.length;
+    });
+    const atom9Score = document.getElementById('score-atom9');
+    if (atom9Score) {
+        atom9Score.textContent = atom9Got + '/' + atom9Total;
+        atom9Score.classList.toggle('completed-score', atom9Total > 0 && atom9Got === atom9Total);
+        atom9Score.classList.toggle('partial-score', atom9Got > 0 && atom9Got < atom9Total);
+    }
 }
 
 function atom8Input(label, kind, id, field, value, disabled) {
@@ -7540,7 +8161,7 @@ function atom8ReindexRouteEntries(modal) {
 }
 
 function atom8OpenRouterModal(routerId) {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     const router = ex.model.routers.find(item => item.id === routerId);
     const state = ex.atom8State.routers[routerId];
     const disabled = !!state.locked;
@@ -7563,15 +8184,17 @@ function atom8OpenRouterModal(routerId) {
     const routes = state.routes.map((route, i) => atom8RouteEntry(route, i, disabled)).join('');
     const routeStatus = ex.atom8State.validation.routes[routerId] || 'gray';
     const maxStaticRoutes = Math.max(1, Number(QUESTION_CONFIG.atom8.maxStaticRoutesPerRouter) || 1);
-    const routeNav = '<button type="button" role="tab" class="atom8-config-nav-btn atom8-route-nav" data-config-panel="static-routes" aria-selected="false">' + atom8StatusDot(routeStatus) + '<span><strong>Static Routing</strong><small>' + state.routes.length + ' configured · ' + router.routeCount + ' remote LAN' + (router.routeCount === 1 ? '' : 's') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
-    const routePanel = '<section role="tabpanel" class="atom8-config-panel" data-config-panel-content="static-routes" hidden><div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div><div><span>ROUTING SETTINGS</span><h3>Static Routes</h3><p>Add routes as needed. Inter-network reachability is checked using destination, mask, next hop, and longest-prefix matching.</p></div>' + atom8StatusDot(routeStatus) + '</div><div class="atom8-route-list">' + routes + '</div>' +
-        (!disabled ? '<div class="atom8-route-actions"><button type="button" class="secondary-btn atom8-add-route" data-max-routes="' + maxStaticRoutes + '"' + (state.routes.length >= maxStaticRoutes ? ' disabled' : '') + '><i class="fa-solid fa-plus" aria-hidden="true"></i> Add Route</button><small>Up to ' + maxStaticRoutes + ' static routes</small></div>' : '') + '</section>';
-    const body = '<div class="atom8-router-config-shell"><aside class="atom8-config-side-nav"><div class="atom8-device-summary"><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span><strong>Router ' + router.number + '</strong><small>Configuration</small></span></div><div class="atom8-config-nav-label">Interfaces</div><div class="atom8-config-nav-list" role="tablist" aria-label="Router settings">' + portNav + '</div><div class="atom8-config-nav-label">Routing</div><div class="atom8-config-nav-list" role="tablist">' + routeNav + '</div></aside><div class="atom8-config-workspace">' + portPanels + routePanel + '</div></div>';
+    const routeNav = router.routeCount > 0 ? '<button type="button" role="tab" class="atom8-config-nav-btn atom8-route-nav" data-config-panel="static-routes" aria-selected="false">' + atom8StatusDot(routeStatus) + '<span><strong>Static Routing</strong><small>' + state.routes.length + ' configured · ' + router.routeCount + ' remote LAN' + (router.routeCount === 1 ? '' : 's') + '</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>' : '';
+    const routePanel = router.routeCount > 0 ? '<section role="tabpanel" class="atom8-config-panel" data-config-panel-content="static-routes" hidden><div class="atom8-config-panel-head"><div class="atom8-config-panel-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div><div><span>ROUTING SETTINGS</span><h3>Static Routes</h3><p>Add routes as needed. Inter-network reachability is checked using destination, mask, next hop, and longest-prefix matching.</p></div>' + atom8StatusDot(routeStatus) + '</div><div class="atom8-route-list">' + routes + '</div>' +
+        (!disabled ? '<div class="atom8-route-actions"><button type="button" class="secondary-btn atom8-add-route" data-max-routes="' + maxStaticRoutes + '"' + (state.routes.length >= maxStaticRoutes ? ' disabled' : '') + '><i class="fa-solid fa-plus" aria-hidden="true"></i> Add Route</button><small>Up to ' + maxStaticRoutes + ' static routes</small></div>' : '') + '</section>'
+        : '';
+    const routingNavigation = router.routeCount > 0 ? '<div class="atom8-config-nav-label">Routing</div><div class="atom8-config-nav-list" role="tablist">' + routeNav + '</div>' : '';
+    const body = '<div class="atom8-router-config-shell"><aside class="atom8-config-side-nav"><div class="atom8-device-summary"><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span><strong>Router ' + router.number + '</strong><small>Configuration</small></span></div><div class="atom8-config-nav-label">Interfaces</div><div class="atom8-config-nav-list" role="tablist" aria-label="Router settings">' + portNav + '</div>' + routingNavigation + '</aside><div class="atom8-config-workspace">' + portPanels + routePanel + '</div></div>';
     atom8ShowModal('Router ' + router.number + ' Configuration', body, 'router', routerId, disabled);
 }
 
 function atom8OpenHostModal(hostId) {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     const host = ex.model.hosts.find(item => item.id === hostId);
     const state = ex.atom8State.hosts[hostId];
     const lan = ex.scenario.lans.find(item => item.id === host.lanId);
@@ -7604,7 +8227,7 @@ function closeAtom8Modal() {
 }
 
 function atom8PopulateAnswerKey() {
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     if (!ex || !QUESTION_CONFIG.atom8.answerKey?.showPopulateButton) return;
     atom8CancelPingAnimation();
     atom8PingState.active = false;
@@ -7614,9 +8237,15 @@ function atom8PopulateAnswerKey() {
     atom8PingState.outcome = null;
     atom8PingState.message = 'Select Test Connection to begin.';
 
-    const previousSpeed = Number(ex.atom8State.connectivityTest?.speed) || Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1;
-    const state = atom8InitialState(ex.model);
-    state.connectivityTest.speed = previousSpeed;
+    const previousConnectivity = {
+        speed: Number(ex.atom8State.connectivityTest?.speed) || Number(QUESTION_CONFIG.atom8.connectivityTest?.defaultSpeed) || 1,
+        autoSend: ex.atom8State.connectivityTest?.autoSend !== false,
+        pairs: Array.isArray(ex.atom8State.connectivityTest?.pairs) ? ex.atom8State.connectivityTest.pairs : []
+    };
+    // Preserve the active exercise's generated suite. Atom 9 items have
+    // different topologies and therefore different official-case counts.
+    const state = atom8InitialState(ex.model, atom8OfficialCases(ex));
+    state.connectivityTest = previousConnectivity;
     const lanBlocks = Object.fromEntries(ex.scenario.solution.lanAllocations.map(allocation => [allocation.lanId, allocation.assigned]));
     const wanBlocks = Object.fromEntries(ex.scenario.solution.wan.assignments.map(assignment => [assignment.wanId, assignment.block]));
     const maskText = block => block.mask.join('.');
@@ -7671,6 +8300,50 @@ function atom8PopulateAnswerKey() {
     updateSummaryPanel();
 }
 
+function atom9ResetCurrentItem() {
+    const ex = atom8CurrentExercise();
+    if (!ex || ex.type !== 'atom9') return;
+    if (!isRetryAllowed()) {
+        showAlertModal('Reset Not Allowed', sessionTimedOut ? 'Reset is not allowed after time expires.' : 'Reset is not allowed in Exam Mode.');
+        return;
+    }
+
+    atom8CancelPingAnimation();
+    atom8OfficialRunAllActive = false;
+    atom8SelfRunAllActive = false;
+    atom8RestartRequest = null;
+    atom8WorkspaceMode = 'configure';
+    atom8RenderedWorkspaceMode = 'configure';
+    atom8TopologyZoom = Number(QUESTION_CONFIG.atom8.topologyView?.defaultZoom) || 1;
+    Object.keys(atom8ListScrollByMode).forEach(mode => { atom8ListScrollByMode[mode] = 0; });
+    Object.keys(atom8TopologyPanByMode).forEach(mode => { atom8TopologyPanByMode[mode] = { x: 0, y: 0 }; });
+    Object.assign(atom8PingState, {
+        active: false,
+        mode: null,
+        caseId: null,
+        sourceId: null,
+        destinationId: null,
+        running: false,
+        paused: false,
+        stopRequested: false,
+        phase: 'idle',
+        outcome: null,
+        message: 'Select Test Connection to begin.'
+    });
+
+    const officialCases = ex.generatedOfficialCases || atom8OfficialCases(ex);
+    ex.atom8State = atom8InitialState(ex.model, officialCases);
+    ex.userAnswer = JSON.stringify(ex.atom8State);
+    ex.score = 0;
+    ex.locked = false;
+    ex.isPartial = false;
+    atom8Validate(ex);
+    saveSessionProgress();
+    renderAtom8View();
+    updateAtom8NavScore();
+    updateSummaryPanel();
+}
+
 function atom8HandleDeviceClick(event) {
     if (event.target.closest?.('[data-review-kind]')) {
         atom8HandleQuickReview(event);
@@ -7681,9 +8354,76 @@ function atom8HandleDeviceClick(event) {
         atom8PopulateAnswerKey();
         return;
     }
+    if (event.target.closest('.atom9-reset-item')) {
+        const modal = document.querySelector(atom8CurrentContainerSelector() + ' .atom9-reset-confirm-modal');
+        if (modal) modal.hidden = false;
+        return;
+    }
+    if (event.target.closest('.atom9-reset-cancel')) {
+        const modal = document.querySelector(atom8CurrentContainerSelector() + ' .atom9-reset-confirm-modal');
+        if (modal) modal.hidden = true;
+        return;
+    }
+    if (event.target.closest('.atom9-reset-confirm')) {
+        atom9ResetCurrentItem();
+        return;
+    }
+    if (event.target.closest('.atom8-zoom-in')) {
+        atom8SetTopologyZoom(atom8TopologyZoom + (Number(QUESTION_CONFIG.atom8.topologyView?.zoomStep) || 0.05));
+        return;
+    }
+    if (event.target.closest('.atom8-zoom-out')) {
+        atom8SetTopologyZoom(atom8TopologyZoom - (Number(QUESTION_CONFIG.atom8.topologyView?.zoomStep) || 0.05));
+        return;
+    }
+    if (event.target.closest('.atom8-zoom-reset')) {
+        atom8TopologyPanByMode[atom8WorkspaceMode] = { x: 0, y: 0 };
+        atom8SetTopologyZoom(Number(QUESTION_CONFIG.atom8.topologyView?.defaultZoom) || 1, true);
+        return;
+    }
+    const modeTab = event.target.closest('.atom8-mode-tab');
+    if (modeTab) {
+        atom8SetWorkspaceMode(modeTab.dataset.mode);
+        return;
+    }
+    if (event.target.closest('.atom8-requirements-open')) {
+        const modal = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-requirements-modal');
+        if (modal) modal.hidden = false;
+        return;
+    }
+    if (event.target.closest('.atom8-requirements-close, .atom8-requirements-backdrop')) {
+        const modal = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-requirements-modal');
+        if (modal) modal.hidden = true;
+        return;
+    }
+    if (event.target.closest('.atom8-play-selected-test')) {
+        atom8PlaySelectedTest();
+        return;
+    }
+    if (event.target.closest('.atom8-pause-active-test')) {
+        atom8ToggleActiveTestPause();
+        return;
+    }
+    if (event.target.closest('.atom8-reset-active-test')) {
+        atom8ResetActiveTest();
+        return;
+    }
+    if (event.target.closest('.atom8-stop-active-test')) {
+        atom8StopActiveTest();
+        return;
+    }
     const officialCase = event.target.closest('.atom8-run-official-case');
     if (officialCase) {
         atom8RunOfficialCase(officialCase.dataset.caseId);
+        return;
+    }
+    const selfPairButton = event.target.closest('.atom8-run-self-pair');
+    if (selfPairButton) {
+        atom8RunSelfPair(selfPairButton.dataset.pairId);
+        return;
+    }
+    if (event.target.closest('.atom8-run-all-self-tests')) {
+        atom8RunAllSelfPairs();
         return;
     }
     if (event.target.closest('.atom8-run-all-tests')) {
@@ -7692,7 +8432,7 @@ function atom8HandleDeviceClick(event) {
     }
     const pingToggle = event.target.closest('.atom8-ping-toggle');
     if (pingToggle) {
-        if (atom8PingState.running || atom8OfficialRunAllActive) return;
+        if (atom8PingState.running || atom8OfficialRunAllActive || atom8SelfRunAllActive) return;
         atom8CancelPingAnimation();
         const opening = !(atom8PingState.active && atom8PingState.mode === 'manual');
         atom8PingState.active = opening;
@@ -7716,20 +8456,138 @@ function atom8HandleDeviceClick(event) {
         renderAtom8View();
         return;
     }
+    if (event.target.closest('.atom8-self-run')) {
+        if (atom8PingState.caseId) atom8RunSelfPair(atom8PingState.caseId);
+        return;
+    }
+    if (event.target.closest('.atom8-clear-self-pairs')) {
+        const ex = atom8CurrentExercise();
+        if (!ex || atom8PingState.running) return;
+        ex.atom8State.connectivityTest.pairs = [];
+        atom8PingState.caseId = null;
+        atom8PingState.sourceId = null;
+        atom8PingState.destinationId = null;
+        atom8PingState.phase = 'select-source';
+        atom8PingState.outcome = null;
+        atom8PingState.message = 'Select the source PC in the topology.';
+        ex.userAnswer = JSON.stringify(ex.atom8State);
+        saveSessionProgress();
+        renderAtom8View();
+        return;
+    }
+    const selfCase = event.target.closest('.atom8-self-case');
+    if (selfCase && !atom8PingState.running) {
+        const ex = atom8CurrentExercise();
+        const pair = ex?.atom8State.connectivityTest?.pairs?.find(item => item.id === selfCase.dataset.pairId);
+        if (pair) {
+            atom8PingState.active = true;
+            atom8PingState.mode = 'manual';
+            atom8PingState.caseId = pair.id;
+            atom8PingState.sourceId = pair.sourceId;
+            atom8PingState.destinationId = pair.destinationId;
+            atom8PingState.phase = pair.status === 'green' || pair.status === 'red' ? 'complete' : 'idle';
+            atom8PingState.outcome = pair.status === 'green' ? 'success' : pair.status === 'red' ? 'failure' : null;
+            atom8PingState.message = pair.message || 'Selected pair is ready to run.';
+            renderAtom8View();
+        }
+        return;
+    }
+    const reviewCase = event.target.closest('.atom8-official-case');
+    if (reviewCase && !atom8PingState.running) {
+        const ex = atom8CurrentExercise();
+        const testCase = atom8OfficialCases().find(item => item.id === reviewCase.dataset.caseId);
+        const source = atom8ResolveOfficialEndpoint(ex, testCase?.source);
+        const destination = atom8ResolveOfficialEndpoint(ex, testCase?.destination);
+        if (source && destination) {
+            atom8PingState.active = true;
+            atom8PingState.mode = 'official';
+            atom8PingState.caseId = testCase.id;
+            atom8PingState.sourceId = source.id;
+            atom8PingState.destinationId = destination.id;
+            atom8PingState.phase = 'idle';
+            atom8PingState.outcome = null;
+            atom8PingState.message = 'Selected case endpoints are highlighted. Choose Test to run it.';
+            renderAtom8View();
+        }
+        return;
+    }
     const button = event.target.closest('.atom8-device-button');
     if (!button) return;
-    if (atom8PingState.active && atom8PingState.mode === 'manual') {
+    if (atom8WorkspaceMode === 'self-test') {
         if (button.dataset.deviceKind === 'host') atom8SelectPingHost(button.dataset.deviceId);
         return;
     }
-    if (atom8PingState.active && atom8PingState.mode === 'official') return;
+    if (atom8WorkspaceMode === 'official') return;
     if (button.dataset.deviceKind === 'router') atom8OpenRouterModal(button.dataset.deviceId);
     else atom8OpenHostModal(button.dataset.deviceId);
+}
+
+function atom8ToggleActiveTestPause() {
+    if (!atom8PingState.running) return;
+    atom8PingState.paused = !atom8PingState.paused;
+    if (atom8PingState.paused) atom8PingAnimation?.pause();
+    else atom8PingAnimation?.play();
+    const button = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-transport-primary');
+    const icon = button?.querySelector('i');
+    button?.classList.toggle('is-paused', atom8PingState.paused);
+    button?.setAttribute('aria-label', atom8PingState.paused ? 'Resume active test' : 'Pause active test');
+    button?.setAttribute('title', atom8PingState.paused ? 'Resume' : 'Pause');
+    if (icon) icon.className = 'fa-solid ' + (atom8PingState.paused ? 'fa-play' : 'fa-pause');
+    const state = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-transport-current > span');
+    if (state) state.innerHTML = '<i class="fa-solid fa-circle" aria-hidden="true"></i>' + (atom8PingState.paused ? 'Paused' : 'Running');
+    const activity = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-case-activity');
+    activity?.classList.toggle('paused', atom8PingState.paused);
+    const activityIcon = activity?.querySelector('i');
+    if (activityIcon) activityIcon.className = 'fa-solid ' + (atom8PingState.paused ? 'fa-pause' : 'fa-wave-square');
+}
+
+function atom8PlaySelectedTest() {
+    if (atom8PingState.running || !atom8PingState.caseId) return;
+    if (atom8PingState.mode === 'official') atom8RunOfficialCase(atom8PingState.caseId);
+    else if (atom8PingState.mode === 'manual') atom8RunSelfPair(atom8PingState.caseId);
+}
+
+function atom8ResetActiveTest() {
+    if (!atom8PingState.running || !atom8PingState.caseId) return;
+    atom8RestartRequest = { mode: atom8PingState.mode, caseId: atom8PingState.caseId };
+    atom8StopActiveTest(true);
+}
+
+function atom8StopActiveTest(preserveRestart = false) {
+    if (!atom8PingState.running) return;
+    const ex = atom8CurrentExercise();
+    if (!ex) return;
+    if (!preserveRestart) atom8RestartRequest = null;
+    atom8PingState.stopRequested = true;
+    atom8OfficialRunAllActive = false;
+    atom8SelfRunAllActive = false;
+    atom8CancelPingAnimation();
+    if (atom8PingState.mode === 'official' && atom8PingState.caseId) {
+        const result = ex.atom8State.officialTests?.results?.[atom8PingState.caseId];
+        if (result) {
+            result.status = 'gray';
+            result.message = 'Stopped · Ready to test again.';
+        }
+        ex.atom8State.officialTests.message = 'Official test stopped. No result was recorded.';
+        atom8ApplyOfficialScore(ex);
+    } else if (atom8PingState.caseId) {
+        const pair = ex.atom8State.connectivityTest?.pairs?.find(item => item.id === atom8PingState.caseId);
+        if (pair) {
+            pair.status = 'gray';
+            pair.message = 'Stopped · Ready to test again.';
+        }
+        atom8PingState.message = 'Self-test stopped. No result was recorded.';
+    }
+    ex.userAnswer = JSON.stringify(ex.atom8State);
+    saveSessionProgress();
+    renderAtom8View();
+    updateSummaryPanel();
 }
 
 function atom8SelectPingHost(hostId) {
     if (atom8PingState.running) return;
     if (!atom8PingState.sourceId || atom8PingState.destinationId) {
+        atom8PingState.caseId = null;
         atom8PingState.sourceId = hostId;
         atom8PingState.destinationId = null;
         atom8PingState.phase = 'select-destination';
@@ -7743,23 +8601,117 @@ function atom8SelectPingHost(hostId) {
         return;
     }
     atom8PingState.destinationId = hostId;
+    const ex = atom8CurrentExercise();
+    const pairs = ex.atom8State.connectivityTest.pairs;
+    const pair = {
+        id: 'self-' + Date.now().toString(36) + '-' + pairs.length,
+        sourceId: atom8PingState.sourceId,
+        destinationId: hostId,
+        status: 'gray',
+        message: 'Not tested'
+    };
+    pairs.push(pair);
+    atom8PingState.caseId = pair.id;
     atom8PingState.phase = 'ready';
     atom8PingState.outcome = null;
-    atom8PingState.message = 'Preparing the ICMP echo request…';
+    atom8PingState.message = ex.atom8State.connectivityTest.autoSend ? 'Pair added. Sending automatically…' : 'Pair added. Choose Run Self-Test or its play icon.';
+    ex.userAnswer = JSON.stringify(ex.atom8State);
+    saveSessionProgress();
     renderAtom8View();
-    setTimeout(atom8RunPingTest, 80);
+    if (ex.atom8State.connectivityTest.autoSend) setTimeout(() => atom8RunSelfPair(pair.id), 80);
 }
 
 function atom8HandleConnectivityInput(event) {
+    const zoomSlider = event.target.closest('.atom8-zoom-slider');
+    if (zoomSlider) {
+        atom8SetTopologyZoom(Number(zoomSlider.value));
+        return;
+    }
+    const autoSend = event.target.closest('.atom8-auto-send-input');
+    if (autoSend) {
+        const ex = atom8CurrentExercise();
+        if (!ex) return;
+        ex.atom8State.connectivityTest.autoSend = autoSend.checked;
+        ex.userAnswer = JSON.stringify(ex.atom8State);
+        saveSessionProgress();
+        return;
+    }
     const slider = event.target.closest('.atom8-ping-speed');
     if (!slider) return;
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     if (!ex) return;
     ex.atom8State.connectivityTest.speed = Number(slider.value);
     const output = slider.closest('.atom8-speed-control')?.querySelector('output');
     if (output) output.textContent = Number(slider.value).toFixed(2).replace(/\.00$/, '') + '×';
     ex.userAnswer = JSON.stringify(ex.atom8State);
     saveSessionProgress();
+}
+
+function atom8SetTopologyZoom(value, resetPan = false) {
+    const viewConfig = QUESTION_CONFIG.atom8.topologyView || {};
+    const minZoom = Number(viewConfig.minZoom) || 0.65;
+    const maxZoom = Number(viewConfig.maxZoom) || 1.4;
+    const nextZoom = Math.min(maxZoom, Math.max(minZoom, Number(value) || 1));
+    const viewport = document.querySelector(atom8CurrentContainerSelector() + ' .atom8-topology-viewport');
+    const plane = viewport?.querySelector('.atom8-topology-zoom-plane');
+    const canvas = plane?.querySelector('.atom8-topology-canvas');
+    const previousZoom = atom8TopologyZoom || 1;
+    const centerX = viewport ? viewport.scrollLeft + viewport.clientWidth / 2 : 0;
+    const centerY = viewport ? viewport.scrollTop + viewport.clientHeight / 2 : 0;
+    atom8TopologyZoom = nextZoom;
+    if (!viewport || !plane || !canvas) return;
+    const baseWidth = Number(plane.dataset.baseWidth) || canvas.offsetWidth;
+    const baseHeight = Number(plane.dataset.baseHeight) || Number(viewConfig.canvasHeight) || 500;
+    plane.style.width = Math.ceil(baseWidth * nextZoom) + 'px';
+    plane.style.height = Math.ceil(baseHeight * nextZoom) + 'px';
+    canvas.style.transform = 'scale(' + nextZoom + ')';
+    const topology = viewport.closest('.atom8-topology');
+    const slider = topology?.querySelector('.atom8-zoom-slider');
+    const output = topology?.querySelector('.atom8-zoom-controls output');
+    if (slider) slider.value = String(nextZoom);
+    if (output) output.textContent = Math.round(nextZoom * 100) + '%';
+    if (resetPan) {
+        viewport.scrollLeft = 0;
+        viewport.scrollTop = 0;
+    } else {
+        const ratio = nextZoom / previousZoom;
+        viewport.scrollLeft = Math.max(0, centerX * ratio - viewport.clientWidth / 2);
+        viewport.scrollTop = Math.max(0, centerY * ratio - viewport.clientHeight / 2);
+    }
+    atom8TopologyPanByMode[atom8WorkspaceMode] = { x: viewport.scrollLeft, y: viewport.scrollTop };
+    atom8ScheduleTopologyConnections();
+}
+
+function atom8HandleTopologyPanStart(event) {
+    const viewport = event.target.closest?.('.atom8-topology-viewport');
+    if (!viewport || event.button !== 0 || event.target.closest('button, input, [data-review-kind], .atom8-link-port-label')) return;
+    atom8TopologyPanState = {
+        viewport,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        scrollLeft: viewport.scrollLeft,
+        scrollTop: viewport.scrollTop
+    };
+    viewport.setPointerCapture?.(event.pointerId);
+    viewport.classList.add('is-dragging');
+}
+
+function atom8HandleTopologyPanMove(event) {
+    const state = atom8TopologyPanState;
+    if (!state || state.pointerId !== event.pointerId) return;
+    state.viewport.scrollLeft = state.scrollLeft - (event.clientX - state.startX);
+    state.viewport.scrollTop = state.scrollTop - (event.clientY - state.startY);
+    atom8TopologyPanByMode[atom8WorkspaceMode] = { x: state.viewport.scrollLeft, y: state.viewport.scrollTop };
+    event.preventDefault();
+}
+
+function atom8HandleTopologyPanEnd(event) {
+    const state = atom8TopologyPanState;
+    if (!state || state.pointerId !== event.pointerId) return;
+    state.viewport.releasePointerCapture?.(event.pointerId);
+    state.viewport.classList.remove('is-dragging');
+    atom8TopologyPanState = null;
 }
 
 function atom8HandleModalClick(event) {
@@ -7799,7 +8751,7 @@ function atom8HandleModalClick(event) {
     }
     if (!event.target.closest('#atom8ApplyConfig')) return;
     const modal = document.getElementById('atom8ConfigModal');
-    const ex = exerciseData['atom8-main'];
+    const ex = atom8CurrentExercise();
     const kind = modal.dataset.kind;
     const id = modal.dataset.id;
     if (kind === 'router') {
@@ -7830,16 +8782,97 @@ function atom8HandleModalClick(event) {
 
 function showAtom8Page() {
     if (!QUESTION_CONFIG.atom8?.enabled || !exerciseData['atom8-main']) return;
+    activeDeploymentExerciseKey = 'atom8-main';
     document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
     document.getElementById('nav-atom8')?.classList.add('active');
-    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View'].forEach(id => {
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View', 'atom9View'].forEach(id => {
         const view = document.getElementById(id);
         if (view) view.style.display = 'none';
     });
     document.getElementById('atom8View').style.display = 'flex';
+    renderAtom8View();
     atom8ScheduleTopologyConnections();
     document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
     hideAllAtomPaginationBars();
+    currentFile = '';
+    closeSampleOutputModal();
+    updateConsoleDrawerTab(false);
+    closeSidebarIfMobile();
+}
+
+function atom9SelectItem(index, options = {}) {
+    if (!atom9QuestionIds.length) return;
+    const nextIndex = Math.max(0, Math.min(atom9QuestionIds.length - 1, Number(index) || 0));
+    atom8CancelPingAnimation();
+    atom9ActiveIndex = nextIndex;
+    activeDeploymentExerciseKey = atom9QuestionIds[nextIndex];
+    atom8WorkspaceMode = options.keepMode ? atom8WorkspaceMode : 'configure';
+    atom8RenderedWorkspaceMode = atom8WorkspaceMode;
+    atom8TopologyZoom = Number(QUESTION_CONFIG.atom8.topologyView?.defaultZoom) || 1;
+    Object.keys(atom8ListScrollByMode).forEach(mode => { atom8ListScrollByMode[mode] = 0; });
+    Object.keys(atom8TopologyPanByMode).forEach(mode => { atom8TopologyPanByMode[mode] = { x: 0, y: 0 }; });
+    atom8PingState.active = false;
+    atom8PingState.mode = null;
+    atom8PingState.caseId = null;
+    atom8PingState.sourceId = null;
+    atom8PingState.destinationId = null;
+    atom8PingState.phase = 'idle';
+    atom8PingState.outcome = null;
+    atom8PingState.message = 'Select Test Connection to begin.';
+    if (!ATOM_PAGINATION.atom9 || ATOM_PAGINATION.atom9.total !== atom9QuestionIds.length) {
+        ATOM_PAGINATION.atom9 = { total: atom9QuestionIds.length, current: nextIndex };
+    } else {
+        ATOM_PAGINATION.atom9.current = nextIndex;
+    }
+    renderAtomPaginationBar('atom9');
+    renderAtom8View();
+}
+
+function renderAtom9View() {
+    const nav = document.getElementById('nav-atom9');
+    const enabled = !!(QUESTION_CONFIG.atom9?.enabled && atom9QuestionIds.length);
+    if (nav) nav.style.display = enabled ? '' : 'none';
+    if (!enabled) {
+        const container = document.getElementById('atom9Container');
+        if (container) container.innerHTML = '';
+        return;
+    }
+    attachAtomPaginationHandlers();
+    atom9ActiveIndex = Math.max(0, Math.min(atom9ActiveIndex, atom9QuestionIds.length - 1));
+    if (!ATOM_PAGINATION.atom9 || ATOM_PAGINATION.atom9.total !== atom9QuestionIds.length) {
+        ATOM_PAGINATION.atom9 = { total: atom9QuestionIds.length, current: atom9ActiveIndex };
+    } else {
+        ATOM_PAGINATION.atom9.current = atom9ActiveIndex;
+    }
+    activeDeploymentExerciseKey = atom9QuestionIds[atom9ActiveIndex];
+    renderAtomPaginationBar('atom9');
+    renderAtom8View();
+}
+
+function syncAtom9ViewDOM() {
+    atom9QuestionIds.forEach(qid => {
+        const ex = exerciseData[qid];
+        if (!ex) return;
+        ex.atom8State = atom8RestoreState(ex);
+        atom8Validate(ex);
+    });
+    renderAtom9View();
+    updateAtom8NavScore();
+    updateSummaryPanel();
+}
+
+function showAtom9Page() {
+    if (!QUESTION_CONFIG.atom9?.enabled || !atom9QuestionIds.length) return;
+    document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+    document.getElementById('nav-atom9')?.classList.add('active');
+    ['exerciseArea', 'subnetVisualizerView', 'atomPlaceholderView', 'atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View', 'atom8View'].forEach(id => {
+        const view = document.getElementById(id);
+        if (view) view.style.display = 'none';
+    });
+    document.getElementById('atom9View').style.display = 'flex';
+    atom9SelectItem(atom9ActiveIndex, { keepMode: true });
+    document.getElementById('timerContainer').style.display = timerIntervalId ? 'flex' : 'none';
+    showAtomPaginationBar('atom9');
     currentFile = '';
     closeSampleOutputModal();
     updateConsoleDrawerTab(false);
@@ -8689,6 +9722,7 @@ function showDefaultLandingPage() {
     const atomPages = [
         ['atom6', showAtom6Page],
         ['atom8', showAtom8Page],
+        ['atom9', showAtom9Page],
         ['atom1', showAtom1Page],
         ['atom2', showAtom2Page],
         ['atom3', showAtom3Page],
@@ -8698,7 +9732,9 @@ function showDefaultLandingPage() {
     for (const [key, showFn] of atomPages) {
         const hasQuestions = key === 'atom8'
             ? !!exerciseData['atom8-main']
-            : Object.keys(exerciseData).some(file => file.indexOf(key + '-q') === 0);
+            : key === 'atom9'
+                ? atom9QuestionIds.length > 0
+                : Object.keys(exerciseData).some(file => file.indexOf(key + '-q') === 0);
         if (hasQuestions) {
             showFn();
             return;
@@ -8717,7 +9753,7 @@ function showDefaultLandingPage() {
     hideAllAtomPaginationBars();
     document.getElementById('subnetVisualizerView').style.display = 'none';
     document.getElementById('atomPlaceholderView').style.display = 'none';
-    ['atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View', 'atom8View'].forEach(id => {
+    ['atom1View', 'atom2View', 'atom3View', 'atom4View', 'atom5View', 'atom6View', 'atom7View', 'atom8View', 'atom9View'].forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
     document.getElementById('exerciseArea').style.display = 'block';
@@ -8744,6 +9780,7 @@ function showSubnetVisualizer() {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('subnetVisualizerView').style.display = 'flex';
 
     hideAllAtomPaginationBars();
@@ -8783,6 +9820,7 @@ function showAtomPage(atomNumber) {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('atomPlaceholderView').style.display = 'block';
     document.getElementById('atomPlaceholderTitle').textContent = `Atom ${atomNumber}`;
 
@@ -8810,6 +9848,7 @@ function switchExercise(name, el) {
     document.getElementById('atom6View').style.display = 'none';
     document.getElementById('atom7View').style.display = 'none';
     document.getElementById('atom8View').style.display = 'none';
+    document.getElementById('atom9View').style.display = 'none';
     document.getElementById('exerciseArea').style.display = 'block';
     // The atom pagination bars are direct children of <main> now (real
     // block-level siblings of #contentScrollArea, not nested inside their
@@ -9416,6 +10455,7 @@ function saveSessionProgress() {
         practiceQuestionMode: appSettings.practiceQuestionMode,
         practiceSeed: currentQuestionSeed,
         atom7Seed: currentAtom7Seed,
+        atom9Seed: currentAtom9Seed,
         persistenceEnabled: appSettings.persistenceEnabled,
         timerEnabled: appSettings.timerEnabled,
         timerMinutes: isTimerActive ? appSettings.timerMinutes : null,

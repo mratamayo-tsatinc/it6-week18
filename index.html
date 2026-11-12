@@ -8,7 +8,7 @@
     <title>Subnetacad</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=20261106-official-tests-v27">
+    <link rel="stylesheet" href="styles.css?v=20261110-test-route-cards-v42">
      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -252,6 +252,10 @@
                 <li id="nav-atom8" onclick="showAtom8Page()">
                     <span><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> Atom 8 · In-App Deployment</span>
                     <span class="nav-score" id="score-atom8">0/0</span>
+                </li>
+                <li id="nav-atom9" onclick="showAtom9Page()">
+                    <span><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Atom 9 · Deployment Practice</span>
+                    <span class="nav-score" id="score-atom9">0/0</span>
                 </li>
             </ul>
             <h3 style="display:none;">Exercises</h3>
@@ -645,6 +649,17 @@
                 <div id="atom8Container" class="atom1-questions-container"></div>
               </div>
 
+              <!-- ============================================================ -->
+              <!-- ATOM 9 — standalone multi-item in-app deployment practice   -->
+              <!-- ============================================================ -->
+              <div id="atom9View" class="subnetify-app atom1-app atom6-app atom8-app atom9-app" style="display:none;">
+                <div class="card-header sv-header">
+                  <h2><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Atom 9 · Deployment Practice</h2>
+                  <p>Complete five independently seeded deployment items from a local two-LAN network through a four-router serial WAN topology.</p>
+                </div>
+                <div id="atom9Container" class="atom1-questions-container"></div>
+              </div>
+
             <!-- ============================================================ -->
             <!-- ATOM PAGES — placeholder views, ungraded, under Subnetify      -->
             <!-- ============================================================ -->
@@ -672,6 +687,7 @@
             <div id="atom4PaginationContainer" class="atom-pagination-container" style="display:none;"></div>
             <div id="atom5PaginationContainer" class="atom-pagination-container" style="display:none;"></div>
             <div id="atom6PaginationContainer" class="atom-pagination-container" style="display:none;"></div>
+            <div id="atom9PaginationContainer" class="atom-pagination-container" style="display:none;"></div>
         </main>
     </div>
 
@@ -714,6 +730,6 @@
     <div id="sampleOutputOverlay" class="modal-overlay" style="display:none;" onclick="closeSampleOutputModal()" aria-hidden="true"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script src="script.js?v=20261106-official-tests-v27"></script>
+    <script src="script.js?v=20261110-test-route-cards-v42"></script>
 </body>
 </html>
